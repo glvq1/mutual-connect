@@ -70,7 +70,7 @@
 <body>
   <!-- ⚠️ Remplacer par l'URL /exec de production (jamais /dev) -->
   <iframe id="app"
-    src="https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec"
+    data-src="https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec"
     allow="camera; microphone; clipboard-read; clipboard-write; fullscreen"
     title="Mutual Connect"></iframe>
 
@@ -94,6 +94,11 @@
   </div>
 
   <script>
+    // --- Chargement de l'appli (?demo=1 → version démo, rien n'est enregistré) ---
+    const frame = document.getElementById('app');
+    const isDemo = new URLSearchParams(location.search).get('demo') === '1';
+    frame.src = frame.dataset.src + (isDemo ? '?demo=1' : '');
+
     // --- Écran de démarrage : sortie quand l'appli est chargée (min 2,6 s, max 10 s) ---
     const splash = document.getElementById('splash');
     const start = Date.now();
@@ -109,7 +114,6 @@
         setTimeout(() => splash.remove(), 2200);
       }, wait);
     }
-    const frame = document.getElementById('app');
     frame.addEventListener('load', enterApp);
     setTimeout(enterApp, 10000);
 
