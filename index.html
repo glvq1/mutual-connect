@@ -6,21 +6,22 @@
   <title>Mutual Connect</title>
   <meta name="theme-color" content="#faf8f3">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icon-192.png">
+  <link rel="icon" href="icon-192.png?v=2">
   <!-- iOS -->
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png?v=2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Mutual Connect">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <style>
     :root { --bg:#faf8f3; --primary:#b8a57a; --text:#3a3a3a; }
     html, body { margin:0; height:100%; background:var(--bg); overflow:hidden; }
-    iframe { position:fixed; inset:0; width:100%; height:100%; border:0; }
+    iframe { position:fixed; inset:0; width:100%; height:100%; border:0; opacity:0; transition:opacity 1.4s ease .2s; }
+    iframe.ready { opacity:1; }
 
     /* ===== Écran de démarrage : assemblage + respiration + portail ===== */
     #splash { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; overflow:hidden; }
     #splash .hole { position:absolute; left:50%; top:50%; width:0; height:0; border-radius:50%;
-                    transform:translate(-50%,-50%); box-shadow:0 0 0 300vmax var(--bg); }
+                    transform:translate(-50%,-50%); box-shadow:0 0 120px 300vmax var(--bg); }
     #splash .halo { position:absolute; left:50%; top:50%; width:min(58vw,300px); aspect-ratio:1; border-radius:50%;
                     border:3px solid var(--primary); opacity:0; transform:translate(-50%,-50%) scale(.8); }
     #splash .logo-wrap { position:relative; width:min(46vw,240px); display:flex; }
@@ -28,26 +29,27 @@
     #splash .logo { transform-box:fill-box; transform-origin:50% 50%; }
     #splash .p { transform-box:fill-box; transform-origin:center; }
     #splash .p1 { --dx:-60px; --dy:-40px; --d:0s; }
-    #splash .p2 { --dx:40px;  --dy:60px;  --d:.08s; }
-    #splash .p3 { --dx:-50px; --dy:20px;  --d:.16s; }
-    #splash .p4 { --dx:60px;  --dy:-50px; --d:.24s; }
-    #splash .p5 { --dx:50px;  --dy:70px;  --d:.32s; }
+    #splash .p2 { --dx:40px;  --dy:60px;  --d:.14s; }
+    #splash .p3 { --dx:-50px; --dy:20px;  --d:.28s; }
+    #splash .p4 { --dx:60px;  --dy:-50px; --d:.42s; }
+    #splash .p5 { --dx:50px;  --dy:70px;  --d:.56s; }
 
-    #splash.play .p    { animation: build .7s cubic-bezier(.2,.9,.25,1.1) var(--d) both; }
-    #splash.play .logo { animation: breathe 2s ease-in-out 1.05s infinite; }
-    #splash.play .halo { animation: halo 2s ease-out 1.05s infinite; }
+    #splash.play .p    { animation: build 1.1s cubic-bezier(.2,.9,.25,1.05) var(--d) both; }
+    #splash.play .logo { animation: breathe 2.8s ease-in-out 1.7s infinite; }
+    #splash.play .halo { animation: halo 2.8s ease-out 1.7s infinite; }
 
-    #splash.exit { pointer-events:none; }
-    #splash.exit .halo { opacity:0; }
-    #splash.exit .p    { animation: burst .8s cubic-bezier(.7,0,.84,0) forwards; }
-    #splash.exit .logo { animation: plunge .75s cubic-bezier(.7,0,.84,0) forwards; }
-    #splash.exit .hole { animation: open .9s cubic-bezier(.65,0,.35,1) .15s forwards; }
+    #splash.exit { pointer-events:none; animation: fadeOut .8s ease 1.2s forwards; }
+    #splash.exit .halo { opacity:0; transition:opacity .6s; }
+    #splash.exit .p    { animation: burst 1.3s cubic-bezier(.55,0,.35,1) forwards; }
+    #splash.exit .logo { animation: plunge 1.3s cubic-bezier(.55,0,.35,1) forwards; }
+    #splash.exit .hole { animation: open 1.8s cubic-bezier(.45,0,.25,1) .2s forwards; }
 
     @keyframes build   { from { opacity:0; transform:translate(var(--dx),var(--dy)) scale(.6); } to { opacity:1; transform:none; } }
     @keyframes breathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.07); } }
     @keyframes halo    { 0% { opacity:.55; transform:translate(-50%,-50%) scale(.8); } 100% { opacity:0; transform:translate(-50%,-50%) scale(1.5); } }
     @keyframes burst   { to { transform:translate(calc(var(--dx) * -3), calc(var(--dy) * -3)); } }
-    @keyframes plunge  { to { transform:scale(6); opacity:0; } }
+    @keyframes plunge  { to { transform:scale(4.5); opacity:0; } }
+    @keyframes fadeOut { to { opacity:0; } }
     @keyframes open    { to { width:300vmax; height:300vmax; } }
 
     /* Accessibilité : animations réduites si demandé par l'appareil */
@@ -92,21 +94,23 @@
   </div>
 
   <script>
-    // --- Écran de démarrage : sortie quand l'appli est chargée (min 1,6 s, max 10 s) ---
+    // --- Écran de démarrage : sortie quand l'appli est chargée (min 2,6 s, max 10 s) ---
     const splash = document.getElementById('splash');
     const start = Date.now();
     let done = false;
     function enterApp() {
       if (done) return;
       done = true;
-      const wait = Math.max(0, 1600 - (Date.now() - start));
+      const wait = Math.max(0, 2600 - (Date.now() - start));
       setTimeout(() => {
         splash.classList.remove('play');
         splash.classList.add('exit');
-        setTimeout(() => splash.remove(), 1200);
+        frame.classList.add('ready');
+        setTimeout(() => splash.remove(), 2200);
       }, wait);
     }
-    document.getElementById('app').addEventListener('load', enterApp);
+    const frame = document.getElementById('app');
+    frame.addEventListener('load', enterApp);
     setTimeout(enterApp, 10000);
 
     // --- Hors connexion ---
