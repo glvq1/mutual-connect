@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Mutual Connect</title>
-  <meta name="theme-color" content="#b8a57a">
+  <meta name="theme-color" content="#faf8f3">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <!-- iOS -->
@@ -13,17 +13,56 @@
   <meta name="apple-mobile-web-app-title" content="Mutual Connect">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <style>
-    html, body { margin: 0; height: 100%; background: #faf8f3; overflow: hidden; }
-    iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
-    #offline {
-      display: none; position: fixed; inset: 0; z-index: 10;
-      background: #faf8f3; color: #3a3a3a; font: 600 20px system-ui, sans-serif;
-      align-items: center; justify-content: center; flex-direction: column; gap: 20px; text-align: center; padding: 24px;
+    :root { --bg:#faf8f3; --primary:#b8a57a; --text:#3a3a3a; }
+    html, body { margin:0; height:100%; background:var(--bg); overflow:hidden; }
+    iframe { position:fixed; inset:0; width:100%; height:100%; border:0; }
+
+    /* ===== Écran de démarrage : assemblage + respiration + portail ===== */
+    #splash { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    #splash .hole { position:absolute; left:50%; top:50%; width:0; height:0; border-radius:50%;
+                    transform:translate(-50%,-50%); box-shadow:0 0 0 300vmax var(--bg); }
+    #splash .halo { position:absolute; left:50%; top:50%; width:min(58vw,300px); aspect-ratio:1; border-radius:50%;
+                    border:3px solid var(--primary); opacity:0; transform:translate(-50%,-50%) scale(.8); }
+    #splash .logo-wrap { position:relative; width:min(46vw,240px); display:flex; }
+    #splash svg { width:100%; overflow:visible; }
+    #splash .logo { transform-box:fill-box; transform-origin:50% 50%; }
+    #splash .p { transform-box:fill-box; transform-origin:center; }
+    #splash .p1 { --dx:-60px; --dy:-40px; --d:0s; }
+    #splash .p2 { --dx:40px;  --dy:60px;  --d:.08s; }
+    #splash .p3 { --dx:-50px; --dy:20px;  --d:.16s; }
+    #splash .p4 { --dx:60px;  --dy:-50px; --d:.24s; }
+    #splash .p5 { --dx:50px;  --dy:70px;  --d:.32s; }
+
+    #splash.play .p    { animation: build .7s cubic-bezier(.2,.9,.25,1.1) var(--d) both; }
+    #splash.play .logo { animation: breathe 2s ease-in-out 1.05s infinite; }
+    #splash.play .halo { animation: halo 2s ease-out 1.05s infinite; }
+
+    #splash.exit { pointer-events:none; }
+    #splash.exit .halo { opacity:0; }
+    #splash.exit .p    { animation: burst .8s cubic-bezier(.7,0,.84,0) forwards; }
+    #splash.exit .logo { animation: plunge .75s cubic-bezier(.7,0,.84,0) forwards; }
+    #splash.exit .hole { animation: open .9s cubic-bezier(.65,0,.35,1) .15s forwards; }
+
+    @keyframes build   { from { opacity:0; transform:translate(var(--dx),var(--dy)) scale(.6); } to { opacity:1; transform:none; } }
+    @keyframes breathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.07); } }
+    @keyframes halo    { 0% { opacity:.55; transform:translate(-50%,-50%) scale(.8); } 100% { opacity:0; transform:translate(-50%,-50%) scale(1.5); } }
+    @keyframes burst   { to { transform:translate(calc(var(--dx) * -3), calc(var(--dy) * -3)); } }
+    @keyframes plunge  { to { transform:scale(6); opacity:0; } }
+    @keyframes open    { to { width:300vmax; height:300vmax; } }
+
+    /* Accessibilité : animations réduites si demandé par l'appareil */
+    @media (prefers-reduced-motion: reduce) {
+      #splash.play .p, #splash.play .logo, #splash.play .halo { animation:none; }
+      #splash.exit { transition:opacity .3s; opacity:0; }
+      #splash.exit .p, #splash.exit .logo, #splash.exit .hole { animation:none; }
     }
-    #offline button {
-      min-height: 56px; padding: 0 32px; border: 0; border-radius: 12px;
-      background: #b8a57a; color: #fff; font: 600 18px system-ui, sans-serif;
-    }
+
+    /* ===== Hors connexion ===== */
+    #offline { display:none; position:fixed; inset:0; z-index:30; background:var(--bg); color:var(--text);
+               font:600 20px system-ui, sans-serif; align-items:center; justify-content:center;
+               flex-direction:column; gap:20px; text-align:center; padding:24px; }
+    #offline button { min-height:56px; padding:0 32px; border:0; border-radius:12px;
+                      background:var(--primary); color:#fff; font:600 18px system-ui, sans-serif; }
   </style>
 </head>
 <body>
@@ -33,17 +72,50 @@
     allow="camera; microphone; clipboard-read; clipboard-write; fullscreen"
     title="Mutual Connect"></iframe>
 
+  <div id="splash" class="play" aria-hidden="true">
+    <div class="hole"></div>
+    <div class="halo"></div>
+    <div class="logo-wrap">
+      <svg viewBox="0 0 234 189"><g class="logo"><g transform="translate(-54,-69)">
+        <polygon class="p p1" fill="#bdac7d" points="54,69.5 54,177.8 166.2,243.8 166.2,213 85,165 85,83.2"/>
+        <polygon class="p p2" fill="#988761" points="166.2,243.8 228.8,208.5 228.8,178 166.2,213"/>
+        <polygon class="p p3" fill="#bdac7d" points="168.8,153 114,122.5 114,152.5 168.8,183.8"/>
+        <polygon class="p p4" fill="#988761" points="168.8,153 168.8,183.8 287.8,114.8 287.8,83.5"/>
+        <polygon class="p p5" fill="#988761" points="287.8,143 257,160.2 257,257.8 287.8,244.5"/>
+      </g></g></svg>
+    </div>
+  </div>
+
   <div id="offline">
     <div>Pas de connexion internet</div>
     <button onclick="location.reload()">Réessayer</button>
   </div>
 
   <script>
+    // --- Écran de démarrage : sortie quand l'appli est chargée (min 1,6 s, max 10 s) ---
+    const splash = document.getElementById('splash');
+    const start = Date.now();
+    let done = false;
+    function enterApp() {
+      if (done) return;
+      done = true;
+      const wait = Math.max(0, 1600 - (Date.now() - start));
+      setTimeout(() => {
+        splash.classList.remove('play');
+        splash.classList.add('exit');
+        setTimeout(() => splash.remove(), 1200);
+      }, wait);
+    }
+    document.getElementById('app').addEventListener('load', enterApp);
+    setTimeout(enterApp, 10000);
+
+    // --- Hors connexion ---
     const off = document.getElementById('offline');
     const show = () => off.style.display = navigator.onLine ? 'none' : 'flex';
     addEventListener('online', () => location.reload());
     addEventListener('offline', show);
     show();
+
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   </script>
 </body>
