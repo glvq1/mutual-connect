@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mutual Connect</title>
+  <meta name="theme-color" content="#b8a57a">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <!-- iOS -->
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Mutual Connect">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <style>
+    html, body { margin: 0; height: 100%; background: #faf8f3; overflow: hidden; }
+    iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+    #offline {
+      display: none; position: fixed; inset: 0; z-index: 10;
+      background: #faf8f3; color: #3a3a3a; font: 600 20px system-ui, sans-serif;
+      align-items: center; justify-content: center; flex-direction: column; gap: 20px; text-align: center; padding: 24px;
+    }
+    #offline button {
+      min-height: 56px; padding: 0 32px; border: 0; border-radius: 12px;
+      background: #b8a57a; color: #fff; font: 600 18px system-ui, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <!-- ⚠️ Remplacer par l'URL /exec de production (jamais /dev) -->
+  <iframe id="app"
+    src="https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec"
+    allow="camera; microphone; clipboard-read; clipboard-write; fullscreen"
+    title="Mutual Connect"></iframe>
+
+  <div id="offline">
+    <div>Pas de connexion internet</div>
+    <button onclick="location.reload()">Réessayer</button>
+  </div>
+
+  <script>
+    const off = document.getElementById('offline');
+    const show = () => off.style.display = navigator.onLine ? 'none' : 'flex';
+    addEventListener('online', () => location.reload());
+    addEventListener('offline', show);
+    show();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  </script>
+</body>
+</html>
