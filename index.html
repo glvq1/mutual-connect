@@ -94,10 +94,12 @@
   </div>
 
   <script>
-    // --- Chargement de l'appli (?demo=1 → version démo, rien n'est enregistré) ---
+    // --- Chargement de l'appli ---
+    // ?pwa=1 → l'appli sait qu'elle est ouverte depuis ce lien (pas de bandeau « installer »)
+    // ?demo=1 → version démo, rien n'est enregistré
     const frame = document.getElementById('app');
     const isDemo = new URLSearchParams(location.search).get('demo') === '1';
-    frame.src = frame.dataset.src + (isDemo ? '?demo=1' : '');
+    frame.src = frame.dataset.src + '?pwa=1' + (isDemo ? '&demo=1' : '');
 
     // --- Écran de démarrage : sortie quand l'appli est chargée (min 2,6 s, max 10 s) ---
     const splash = document.getElementById('splash');

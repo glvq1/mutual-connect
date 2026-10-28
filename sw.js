@@ -1,5 +1,5 @@
 // Service worker minimal : met en cache la coquille (pas l'app Apps Script, toujours en ligne)
-const CACHE = 'mutual-shell-v2';
+const CACHE = 'mutual-shell-v3';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
