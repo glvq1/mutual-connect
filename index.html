@@ -191,8 +191,15 @@
       if (!pushSupporte) return envoyerAppli({ etat: 'non-supporte', ios: isIOS });
       let token = null;
       if (Notification.permission === 'granted') {
-        try { token = await getMessaging().getToken({ vapidKey: cfg.vapidKey, serviceWorkerRegistration: await swReg }); }
-        catch (e) { console.warn('Jeton push :', e); pushErreur(e); }
+        // iOS : le service worker doit être actif, et le 1er appel échoue parfois → 2e essai
+        const demander = async () => getMessaging().getToken({ vapidKey: cfg.vapidKey, serviceWorkerRegistration: await navigator.serviceWorker.ready });
+        try { token = await demander(); }
+        catch (e1) {
+          console.warn('Jeton push (1er essai) :', e1);
+          await new Promise(r => setTimeout(r, 1500));
+          try { token = await demander(); }
+          catch (e) { console.warn('Jeton push :', e); pushErreur(e); }
+        }
       }
       envoyerAppli({ etat: Notification.permission, token });
     }
