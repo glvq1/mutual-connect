@@ -153,6 +153,15 @@
 
     const swReg = 'serviceWorker' in navigator ? navigator.serviceWorker.register('sw.js') : null;
 
+    // Appli ouverte / remise au premier plan → efface les notifications et la pastille de l'icône
+    function effacerPastille() {
+      if (document.hidden) return;
+      try { if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {}); } catch (e) {}
+      if (swReg) swReg.then(r => r.getNotifications()).then(l => l.forEach(n => n.close())).catch(() => {});
+    }
+    effacerPastille();
+    document.addEventListener('visibilitychange', effacerPastille);
+
     // ===== NOTIFICATIONS PUSH (Firebase Cloud Messaging) =====
     // L'appli (iframe Apps Script) dialogue avec cette page par postMessage :
     //   appli → { mc:'push', action:'etat' | 'activer' }

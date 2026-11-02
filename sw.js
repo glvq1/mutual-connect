@@ -26,13 +26,14 @@ try {
 // sinon ouvre l'appli (dans sa fenêtre d'appli installée si elle est installée)
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  try { if (self.navigator.clearAppBadge) self.navigator.clearAppBadge(); } catch (err) {}
   const url = self.registration.scope;
   e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
     const ouverte = list.find(c => c.url.startsWith(url));
     return ouverte ? ouverte.focus() : clients.openWindow(url);
   }));
 });
-const CACHE = 'mutual-shell-v5';
+const CACHE = 'mutual-shell-v6';
 const SHELL = ['./', 'index.html', 'manifest.json', 'firebase-config.js', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
