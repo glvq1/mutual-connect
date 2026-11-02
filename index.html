@@ -172,8 +172,8 @@
       messaging = firebase.messaging();
       // Appli ouverte au premier plan : on affiche quand même la notification
       messaging.onMessage(p => {
-        const n = p.notification || {};
-        swReg.then(r => r.showNotification(n.title || 'Mutual Connect', { body: n.body || '', icon: 'icon-192.png', data: { url: location.href } }));
+        const n = p.notification || p.data || {};
+        swReg.then(r => r.showNotification(n.title || 'Mutual Connect', { body: n.body || '', icon: 'icon-192.png', badge: 'icon-192.png', data: { url: r.scope } }));
       });
       return messaging;
     }

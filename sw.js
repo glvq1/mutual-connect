@@ -8,23 +8,31 @@ try {
   );
   if (self.MC_FIREBASE && self.MC_FIREBASE.config && self.MC_FIREBASE.config.apiKey) {
     firebase.initializeApp(self.MC_FIREBASE.config);
-    firebase.messaging(); // affiche automatiquement les notifications reçues appli fermée
+    // Messages « data » : la notification est affichée ici, pour que l'appui ouvre l'appli installée
+    firebase.messaging().onBackgroundMessage(p => {
+      const d = p.data || {};
+      if (p.notification) return; // ancien format : déjà affiché par Firebase
+      return self.registration.showNotification(d.title || 'Mutual Connect', {
+        body: d.body || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: d.tag || undefined,
+        data: { url: self.registration.scope }
+      });
+    });
   }
 } catch (e) {
   // Firebase injoignable : la coquille hors ligne continue de fonctionner, sans push
 }
 
-// Appui sur une notification affichée par la page (appli ouverte) → ramène l'appli au premier plan
+// Appui sur une notification → remet au premier plan la fenêtre déjà ouverte,
+// sinon ouvre l'appli (dans sa fenêtre d'appli installée si elle est installée)
 self.addEventListener('notificationclick', e => {
-  if (e.notification.data && e.notification.data.FCM_MSG) return; // géré par Firebase
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || './';
+  const url = self.registration.scope;
   e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    const ouverte = list.find(c => c.url.startsWith(self.registration.scope));
+    const ouverte = list.find(c => c.url.startsWith(url));
     return ouverte ? ouverte.focus() : clients.openWindow(url);
   }));
 });
-const CACHE = 'mutual-shell-v4';
+const CACHE = 'mutual-shell-v5';
 const SHELL = ['./', 'index.html', 'manifest.json', 'firebase-config.js', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
