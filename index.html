@@ -63,6 +63,16 @@
     #offline { display:none; position:fixed; inset:0; z-index:30; background:var(--bg); color:var(--text);
                font:600 20px system-ui, sans-serif; align-items:center; justify-content:center;
                flex-direction:column; gap:20px; text-align:center; padding:24px; }
+    /* ===== Demande d'autorisation des notifications ===== */
+    #pushAsk { display:none; position:fixed; inset:0; z-index:40; background:rgba(40,32,20,.55); align-items:center; justify-content:center; padding:20px; }
+    #pushAsk .box { background:#fff; border-radius:16px; padding:24px 22px; max-width:380px; width:100%; text-align:center;
+                    font:500 16px/1.45 system-ui, sans-serif; color:var(--text); box-shadow:0 10px 40px rgba(0,0,0,.25); }
+    #pushAsk .ico { font-size:40px; }
+    #pushAsk h2 { font-size:20px; margin:8px 0 6px; }
+    #pushAsk button { display:block; width:100%; min-height:52px; margin-top:12px; border:0; border-radius:12px; font:700 17px system-ui, sans-serif; }
+    #pushAsk .ok { background:var(--primary); color:#fff; }
+    #pushAsk .no { background:#f0ebe0; color:var(--text); }
+
     #offline button { min-height:56px; padding:0 32px; border:0; border-radius:12px;
                       background:var(--primary); color:#fff; font:600 18px system-ui, sans-serif; }
   </style>
@@ -92,6 +102,21 @@
     <div>Pas de connexion internet</div>
     <button onclick="location.reload()">Réessayer</button>
   </div>
+
+  <div id="pushAsk" role="dialog" aria-modal="true" aria-labelledby="pushAskTitre">
+    <div class="box">
+      <div class="ico">🔔</div>
+      <h2 id="pushAskTitre">Activer les notifications</h2>
+      <div>Mutual Connect pourra vous prévenir des nouvelles remontées, même appli fermée.</div>
+      <button class="ok" onclick="pushAutoriser()">Autoriser</button>
+      <button class="no" onclick="pushPlusTard()">Plus tard</button>
+    </div>
+  </div>
+
+  <!-- Firebase (notifications push) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+  <script src="firebase-config.js"></script>
 
   <script>
     // --- Chargement de l'appli ---
@@ -126,7 +151,59 @@
     addEventListener('offline', show);
     show();
 
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    const swReg = 'serviceWorker' in navigator ? navigator.serviceWorker.register('sw.js') : null;
+
+    // ===== NOTIFICATIONS PUSH (Firebase Cloud Messaging) =====
+    // L'appli (iframe Apps Script) dialogue avec cette page par postMessage :
+    //   appli → { mc:'push', action:'etat' | 'activer' }
+    //   page  → { mc:'push', etat:'granted'|'default'|'denied'|'non-supporte', token, ios }
+    const cfg = window.MC_FIREBASE || {};
+    const pushConfigure = !!(cfg.config && cfg.config.apiKey && cfg.vapidKey && window.firebase);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const pushSupporte = pushConfigure && !!swReg && 'PushManager' in window && 'Notification' in window;
+    let appWin = null, appOrigin = null, messaging = null;
+
+    const origineAppli = o => { try { const h = new URL(o).hostname; return h.endsWith('.googleusercontent.com') || h === 'script.google.com'; } catch (e) { return false; } };
+    const envoyerAppli = msg => { if (appWin) appWin.postMessage(Object.assign({ mc: 'push' }, msg), appOrigin); };
+
+    function getMessaging() {
+      if (messaging) return messaging;
+      firebase.initializeApp(cfg.config);
+      messaging = firebase.messaging();
+      // Appli ouverte au premier plan : on affiche quand même la notification
+      messaging.onMessage(p => {
+        const n = p.notification || {};
+        swReg.then(r => r.showNotification(n.title || 'Mutual Connect', { body: n.body || '', icon: 'icon-192.png', data: { url: location.href } }));
+      });
+      return messaging;
+    }
+
+    async function pushEtat() {
+      if (!pushSupporte) return envoyerAppli({ etat: 'non-supporte', ios: isIOS });
+      let token = null;
+      if (Notification.permission === 'granted') {
+        try { token = await getMessaging().getToken({ vapidKey: cfg.vapidKey, serviceWorkerRegistration: await swReg }); }
+        catch (e) { console.warn('Jeton push :', e); }
+      }
+      envoyerAppli({ etat: Notification.permission, token });
+    }
+
+    const pushAsk = document.getElementById('pushAsk');
+    function pushAutoriser() {
+      pushAsk.style.display = 'none';
+      Notification.requestPermission().then(pushEtat, pushEtat);
+    }
+    function pushPlusTard() { pushAsk.style.display = 'none'; pushEtat(); }
+
+    addEventListener('message', e => {
+      if (!e.data || e.data.mc !== 'push' || !origineAppli(e.origin)) return;
+      appWin = e.source; appOrigin = e.origin;
+      if (e.data.action === 'etat') pushEtat();
+      if (e.data.action === 'activer') {
+        if (!pushSupporte || Notification.permission !== 'default') return pushEtat();
+        pushAsk.style.display = 'flex'; // la demande d'autorisation doit venir d'un appui sur cette page
+      }
+    });
   </script>
 </body>
 </html>
