@@ -191,7 +191,28 @@
     const pushAsk = document.getElementById('pushAsk');
     function pushAutoriser() {
       pushAsk.style.display = 'none';
-      Notification.requestPermission().then(pushEtat, pushEtat);
+      Notification.requestPermission().then(p => {
+        console.info('[push] réponse autorisation :', p);
+        if (p !== 'granted') pushAide(p);
+        pushEtat();
+      }, pushEtat);
+    }
+
+    // Autorisation refusée ou demande masquée par le navigateur → explication à l'écran
+    function pushAide(perm) {
+      const box = pushAsk.querySelector('.box');
+      box.innerHTML = '<div class="ico">🔕</div><h2>Notifications non autorisées</h2>'
+        + '<div style="font-size:14.5px;text-align:left">'
+        + (perm === 'denied'
+            ? 'Les notifications sont <b>bloquées</b> pour Mutual Connect.'
+            : 'Le navigateur n\'a pas affiché la demande d\'autorisation.')
+        + '<br><br><b>Pour les autoriser :</b><ol style="padding-left:20px;margin:6px 0">'
+        + '<li>Menu <b>⋯</b> de la fenêtre de l\'appli → <b>Informations sur l\'application</b> / <b>Paramètres de l\'application</b> (ou <b>Autorisations</b>)</li>'
+        + '<li><b>Notifications</b> → <b>Autoriser</b></li>'
+        + '<li>Fermer puis rouvrir l\'appli, puis 🔔 → Enregistrer</li></ol>'
+        + 'Sous Windows, vérifier aussi <b>Paramètres → Système → Notifications</b> : le navigateur doit être autorisé.</div>'
+        + '<button class="no" onclick="location.reload()">Fermer</button>';
+      pushAsk.style.display = 'flex';
     }
     // Affiche l'erreur à l'écran (diagnostic) si le jeton n'a pas pu être obtenu
     function pushErreur(e) {
@@ -208,6 +229,8 @@
       appWin = e.source; appOrigin = e.origin;
       if (e.data.action === 'etat') pushEtat();
       if (e.data.action === 'activer') {
+        console.info('[push] activer — supporté :', pushSupporte, '— permission :', window.Notification && Notification.permission);
+        if (pushSupporte && Notification.permission === 'denied') { pushAide('denied'); return pushEtat(); }
         if (!pushSupporte || Notification.permission !== 'default') return pushEtat();
         pushAsk.style.display = 'flex'; // la demande d'autorisation doit venir d'un appui sur cette page
       }
