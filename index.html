@@ -183,7 +183,7 @@
       let token = null;
       if (Notification.permission === 'granted') {
         try { token = await getMessaging().getToken({ vapidKey: cfg.vapidKey, serviceWorkerRegistration: await swReg }); }
-        catch (e) { console.warn('Jeton push :', e); }
+        catch (e) { console.warn('Jeton push :', e); pushErreur(e); }
       }
       envoyerAppli({ etat: Notification.permission, token });
     }
@@ -192,6 +192,14 @@
     function pushAutoriser() {
       pushAsk.style.display = 'none';
       Notification.requestPermission().then(pushEtat, pushEtat);
+    }
+    // Affiche l'erreur à l'écran (diagnostic) si le jeton n'a pas pu être obtenu
+    function pushErreur(e) {
+      const box = pushAsk.querySelector('.box');
+      box.innerHTML = '<div class="ico">⚠️</div><h2>Notifications indisponibles</h2>'
+        + '<div style="font-size:14px;word-break:break-word">' + String((e && (e.code || '')) + ' ' + (e && e.message || e)).replace(/</g, '&lt;') + '</div>'
+        + '<button class="no" onclick="location.reload()">Fermer</button>';
+      pushAsk.style.display = 'flex';
     }
     function pushPlusTard() { pushAsk.style.display = 'none'; pushEtat(); }
 
