@@ -83,6 +83,13 @@
     data-src="https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec"
     allow="camera; microphone; clipboard-read; clipboard-write; fullscreen"
     title="Mutual Connect"></iframe>
+  <script>
+    // Chargement immédiat de l'appli (sans attendre Firebase)
+    // ?pwa=1 → pas de bandeau « installer » ; ?demo=1 → version démo
+    const frame = document.getElementById('app');
+    const isDemo = new URLSearchParams(location.search).get('demo') === '1';
+    frame.src = frame.dataset.src + '?pwa=1' + (isDemo ? '&demo=1' : '');
+  </script>
 
   <div id="splash" class="play" aria-hidden="true">
     <div class="hole"></div>
@@ -119,13 +126,6 @@
   <script src="firebase-config.js"></script>
 
   <script>
-    // --- Chargement de l'appli ---
-    // ?pwa=1 → l'appli sait qu'elle est ouverte depuis ce lien (pas de bandeau « installer »)
-    // ?demo=1 → version démo, rien n'est enregistré
-    const frame = document.getElementById('app');
-    const isDemo = new URLSearchParams(location.search).get('demo') === '1';
-    frame.src = frame.dataset.src + '?pwa=1' + (isDemo ? '&demo=1' : '');
-
     // --- Écran de démarrage : sortie quand l'appli est chargée (min 2,6 s, max 10 s) ---
     const splash = document.getElementById('splash');
     const start = Date.now();
@@ -147,7 +147,7 @@
     // --- Hors connexion ---
     const off = document.getElementById('offline');
     const show = () => off.style.display = navigator.onLine ? 'none' : 'flex';
-    addEventListener('online', () => location.reload());
+    addEventListener('online', () => { if (off.style.display === 'flex') location.reload(); });
     addEventListener('offline', show);
     show();
 
@@ -161,6 +161,14 @@
     }
     effacerPastille();
     document.addEventListener('visibilitychange', effacerPastille);
+
+    // Appli restée en arrière-plan > 20 min : Android/iOS a pu geler l'appli → rechargement propre
+    let cacheeDepuis = 0;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { cacheeDepuis = Date.now(); return; }
+      if (cacheeDepuis && Date.now() - cacheeDepuis > 20 * 60 * 1000) location.reload();
+    });
+    addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
 
     // ===== NOTIFICATIONS PUSH (Firebase Cloud Messaging) =====
     // L'appli (iframe Apps Script) dialogue avec cette page par postMessage :
