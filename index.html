@@ -209,7 +209,11 @@
           catch (e) { console.warn('Jeton push :', e); pushErreur(e); }
         }
       }
-      envoyerAppli({ etat: Notification.permission, token });
+      // Jeton changé (mise à jour, renouvellement Firebase) → l'appli recopie les préférences
+      let ancien = null;
+      try { ancien = localStorage.getItem('mc_push_token'); if (token) localStorage.setItem('mc_push_token', token); } catch (e) {}
+      envoyerAppli({ etat: Notification.permission, token,
+                     ancienToken: (token && ancien && ancien !== token) ? ancien : null });
     }
 
     const pushAsk = document.getElementById('pushAsk');
