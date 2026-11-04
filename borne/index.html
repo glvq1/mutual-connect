@@ -127,9 +127,6 @@
     .vide { text-align: center; color: var(--muted); padding: 30px; }
 
     /* Divers */
-    .scan-bloc { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--bg); border: 2px dashed var(--line); }
-    .scan-btn { min-height: 60px; padding: 0 22px; border-radius: 12px; background: var(--primary); color: #fff; font-weight: 800; font-size: 18px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
-    .scan-aide { font-size: 15px; color: var(--muted); font-weight: 600; }
     .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: #3a3a3a; color: #fff; padding: 16px 22px; border-radius: 14px;
       font-weight: 700; z-index: 20; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
     .toast.erreur-t { background: var(--red); }
@@ -480,9 +477,8 @@
     $('formCorps').innerHTML = def.etapes.map((etape, i) => {
       const champs = etape.champs.filter(c => !c.si || c.si(valeurs));
       if (!champs.length) return '';
-      const scan = champs.some(c => c.nom === 'Allées') ? blocScan() : '';
       return `<div class="etape"><div class="etape-titre"><span class="etape-num">${i + 1}</span>${esc(etape.titre)}</div>`
-        + scan + champs.map(rendreChamp).join('') + '</div>';
+        + champs.map(rendreChamp).join('') + '</div>';
     }).join('');
   }
 
@@ -551,6 +547,8 @@
   function saisie(el) { valeurs[el.dataset.nom] = el.value; $('formErreur').textContent = ''; }
 
   // ----- Code-barres d'emplacement -----
+  // Tablette fixée sur un support : pas de scan à l'écran. Si une douchette est un jour branchée,
+  // elle remplit quand même allée / emplacement / niveau (lecture clavier ci-dessous).
   // Étiquette A-008-1530-00 → code-barres « A008153000 » : zone, allée (008), emplacement (1530),
   // niveau (00 = sol ; 01, 02… picking dynamique ; 10, 20… en hauteur).
   function lireCodeEmplacement(brut) {
@@ -561,11 +559,6 @@
   }
   function formAvecEmplacement() {
     return formType && document.querySelector('#eForm.actif') && FORMS[formType].etapes.some(e => e.champs.some(c => c.nom === 'Allées'));
-  }
-  function blocScan() {
-    return '<div class="scan-bloc">'
-      + ('BarcodeDetector' in window ? '<label class="scan-btn">📷 Scanner l\'étiquette<input type="file" accept="image/*" capture="environment" hidden onchange="scannerPhoto(this)"></label>' : '')
-      + '<span class="scan-aide">Scanne l\'étiquette de l\'emplacement : allée et emplacement se remplissent seuls.</span></div>';
   }
   function appliquerCode(brut) {
     if (!formAvecEmplacement()) return;
@@ -583,16 +576,6 @@
     const y = window.scrollY; rendreForm(); window.scrollTo(0, y);
     $('formErreur').textContent = '';
     toast('Emplacement ' + c.libelle + ' lu' + info);
-  }
-  async function scannerPhoto(input) {
-    const f = input.files && input.files[0];
-    input.value = '';
-    if (!f) return;
-    try {
-      const codes = await new BarcodeDetector().detect(await createImageBitmap(f));
-      const lu = codes.map(c => c.rawValue).find(v => lireCodeEmplacement(v));
-      if (lu) appliquerCode(lu); else toast(codes.length ? 'Ce code n\'est pas une étiquette d\'emplacement.' : 'Aucun code-barres trouvé. Rapproche-toi de l\'étiquette.', true);
-    } catch (e) { toast('Lecture impossible.', true); }
   }
   // Douchette branchée sur la tablette : elle « tape » le code puis Entrée
   let scanTampon = '', scanDernier = 0;
