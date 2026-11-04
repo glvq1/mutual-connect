@@ -43,7 +43,8 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+    // Ne supprime que les anciens caches de Mutual Connect (pas celui de la borne, même domaine)
+    Promise.all(keys.filter(k => k.indexOf('mutual-shell-') === 0 && k !== CACHE).map(k => caches.delete(k)))));
   self.clients.claim();
 });
 

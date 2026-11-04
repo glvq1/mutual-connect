@@ -105,3 +105,13 @@ Tablettes de l'entrepôt : les installer soi-même une fois.
 - Appareils très anciens (Android ≤ 7, iOS ≤ 15) non garantis.
 - iPhone/iPad : l'export Excel ouvre un aperçu → Partager → Enregistrer dans Fichiers.
 - Firefox ordinateur : installation non garantie, navigateur OK.
+
+## Borne libre-service (`/borne/`)
+
+Tablette en libre-service pour les opérateurs : https://glvq1.github.io/mutual-connect/borne/
+
+- Identification par code opérateur (`FR` + 3 lettres + 2 ou 3 chiffres).
+- Remontées techniques (formulaires existants simplifiés) et locaux (salle de pause, chambre, toilettes, vestiaires, autre).
+- Doublons : si la même remontée est déjà ouverte, l'opérateur ajoute son signalement (compteur ×N, push « Doublon » à l'encadrement, pas de mail).
+- Suivi anonymisé des 14 derniers jours (statut + commentaire de l'encadrement, jamais de nom).
+- Parle uniquement au `doPost()` de l'Apps Script (`Borne.gs`). Code d'installation : lancer `initialiserBorne()` dans l'éditeur, puis le saisir une fois sur la tablette.
