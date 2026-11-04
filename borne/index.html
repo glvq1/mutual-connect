@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#8c7a5a">
+  <title>Mutual Borne</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="../icon-192.png">
+  <link rel="apple-touch-icon" href="../icon-192.png">
+  <style>
+    :root {
+      --bg: #faf8f3; --primary: #b8a57a; --secondary: #8c7a5a; --text: #3a3a3a;
+      --line: #e9e1cf; --soft: #f0ebe0; --sel: #f5efe2; --muted: #8c7a5a;
+      --red: #b03a2e; --red-bg: #fbeaea; --amber: #a85400; --amber-bg: #fdf0dc; --green: #27500a; --green-bg: #eaf3de;
+      --touch: 64px; --radius: 14px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+      font: 500 18px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overscroll-behavior: none;
+      -webkit-user-select: none; user-select: none; }
+    input, textarea { -webkit-user-select: text; user-select: text; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    [hidden] { display: none !important; }
+
+    /* En-tête (même identité que Mutual Connect) */
+    .hdr { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 12px 22px;
+      background: linear-gradient(135deg, #8c7a5a 0%, #b8a57a 100%); color: #fff; min-height: 76px; }
+    .logo-chip { background: #fff; border-radius: 12px; padding: 7px 12px; display: flex; align-items: center; }
+    .logo-chip img { height: 34px; display: block; }
+    .hdr-titre { font-size: 22px; font-weight: 800; }
+    .hdr-titre small { display: block; font-size: 13px; font-weight: 600; opacity: .85; }
+    .hdr-droite { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .pill { min-height: 52px; padding: 0 18px; border-radius: 26px; border: 0; background: rgba(255,255,255,.18); color: #fff;
+      font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+    .pill.blanc { background: #fff; color: var(--secondary); }
+    .code-actif { font-family: ui-monospace, Menlo, monospace; letter-spacing: 2px; font-weight: 800; }
+
+    main { max-width: 1180px; margin: 0 auto; padding: 22px 22px 40px; }
+    .ecran { display: none; }
+    .ecran.actif { display: block; animation: apparait .18s ease-out; }
+    @keyframes apparait { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    h1 { font-size: 28px; margin: 4px 0 6px; }
+    .sous { color: var(--muted); margin: 0 0 20px; font-size: 17px; }
+    .retour { min-height: 52px; padding: 0 18px; border-radius: 26px; border: 2px solid var(--line); background: #fff; font-weight: 700; margin-bottom: 14px; }
+
+    /* Tuiles */
+    .tuiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+    .tuile { min-height: 150px; border-radius: 18px; border: 2px solid var(--line); background: #fff; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; font-size: 20px; font-weight: 800; }
+    .tuile:active { transform: scale(.98); background: var(--sel); }
+    .tuile .ico { width: 64px; height: 64px; border-radius: 50%; background: var(--soft); display: flex; align-items: center; justify-content: center; font-size: 32px; }
+    .tuile small { font-size: 14px; font-weight: 600; color: var(--muted); }
+    .tuile.secondaire { border-style: dashed; border-color: var(--primary); }
+
+    /* Formulaires */
+    .etape { background: #fff; border: 2px solid var(--line); border-radius: 18px; padding: 18px 20px; margin-bottom: 16px; }
+    .etape-titre { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 800; margin-bottom: 14px; }
+    .etape-num { width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; flex: none; }
+    .etape-titre small { font-weight: 600; color: var(--muted); font-size: 15px; }
+    .champ-lbl { font-weight: 700; margin: 14px 0 8px; }
+    .champ-lbl:first-child { margin-top: 0; }
+    .opt { color: var(--muted); font-weight: 600; font-size: 15px; }
+    .choix { display: flex; flex-wrap: wrap; gap: 10px; }
+    .choix button { min-height: var(--touch); min-width: 76px; padding: 0 20px; border-radius: 12px; border: 2px solid var(--line); background: #fff; font-weight: 700; font-size: 18px; }
+    .choix button[aria-pressed="true"] { border-color: var(--primary); background: var(--sel); box-shadow: inset 0 0 0 1px var(--primary); }
+    .choix.grille { display: grid; grid-template-columns: repeat(10, 1fr); }
+    .choix.grille button { min-width: 0; padding: 0; }
+    .groupe-titre { font-size: 15px; font-weight: 700; color: var(--muted); margin: 12px 0 6px; }
+    .afficheur { min-height: var(--touch); border-radius: 12px; border: 2px solid var(--line); background: #fff; display: flex; align-items: center;
+      padding: 0 18px; font-size: 26px; font-weight: 800; letter-spacing: 2px; font-family: ui-monospace, Menlo, monospace; }
+    .afficheur.vide { color: #b5aa94; font-size: 18px; letter-spacing: 0; font-family: inherit; font-weight: 600; }
+    .pave { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 10px; max-width: 560px; }
+    .pave button { min-height: var(--touch); border-radius: 12px; border: 2px solid var(--line); background: #fff; font-size: 24px; font-weight: 800; }
+    .pave button:active, .choix button:active { background: var(--sel); }
+    textarea, input.texte { width: 100%; border-radius: 12px; border: 2px solid var(--line); background: #fff; padding: 14px 16px; font: inherit; font-size: 19px; color: var(--text); }
+    textarea { min-height: 110px; resize: vertical; }
+    textarea:focus, input.texte:focus { outline: none; border-color: var(--primary); }
+    .barre-envoi { display: flex; gap: 14px; margin-top: 8px; }
+    .btn { min-height: 68px; border-radius: 14px; border: 0; font-size: 20px; font-weight: 800; padding: 0 26px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+    .btn.principal { background: var(--primary); color: #fff; flex: 1; }
+    .btn.principal:disabled { opacity: .6; }
+    .btn.second { background: var(--soft); color: var(--text); }
+    .btn.large { flex: 1; }
+    .erreur { color: var(--red); font-weight: 700; margin-top: 10px; min-height: 24px; }
+
+    /* Identification */
+    .ident { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 26px; align-items: start; }
+    .ident-carte { background: #fff; border: 2px solid var(--line); border-radius: 18px; padding: 22px; }
+    .code-aff { font-family: ui-monospace, Menlo, monospace; font-size: 40px; font-weight: 800; letter-spacing: 6px; text-align: center; padding: 18px 10px;
+      border-radius: 14px; border: 2px solid var(--line); background: var(--bg); min-height: 92px; }
+    .code-aff .reste { color: #cfc5ae; }
+    .clavier { display: grid; gap: 8px; grid-template-columns: repeat(7, 1fr); }
+    .clavier.chiffres { grid-template-columns: repeat(5, 1fr); }
+    .clavier button { min-height: 66px; border-radius: 12px; border: 2px solid var(--line); background: #fff; font-size: 24px; font-weight: 800; }
+    .clavier button.action { background: var(--soft); font-size: 18px; }
+    .clavier button:active { background: var(--sel); }
+    .aide { font-size: 15px; color: var(--muted); margin-top: 10px; text-align: center; }
+    .ok-format { color: var(--green); font-weight: 700; text-align: center; margin-top: 10px; min-height: 24px; }
+
+    /* Résultats */
+    .resultat { max-width: 720px; margin: 30px auto; background: #fff; border: 2px solid var(--line); border-radius: 22px; padding: 34px 30px; text-align: center; }
+    .rond { width: 92px; height: 92px; border-radius: 50%; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; font-size: 48px; color: #fff; background: var(--primary); }
+    .rond.ambre { background: var(--amber-bg); color: var(--amber); }
+    .resultat h2 { font-size: 28px; margin: 6px 0; }
+    .resultat p { color: var(--muted); margin: 6px 0; font-size: 18px; }
+    .encart { background: var(--amber-bg); border: 2px solid #efc98a; border-radius: 14px; padding: 14px 16px; color: #633806; margin: 16px 0; text-align: left; }
+    .encart b { display: block; font-size: 19px; }
+    .resultat .barre-envoi { margin-top: 22px; }
+    .compte { font-size: 15px; color: var(--muted); margin-top: 14px; }
+
+    /* Suivi */
+    .filtres { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .filtres button { min-height: 52px; padding: 0 18px; border-radius: 26px; border: 2px solid var(--line); background: #fff; font-weight: 700; }
+    .filtres button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+    table.suivi { width: 100%; border-collapse: collapse; background: #fff; border-radius: 16px; overflow: hidden; border: 2px solid var(--line); }
+    .suivi th { text-align: left; font-size: 15px; color: var(--muted); padding: 12px 14px; border-bottom: 2px solid var(--line); background: #fdfbf6; }
+    .suivi td { padding: 14px; border-bottom: 1px solid var(--soft); vertical-align: top; font-size: 17px; }
+    .suivi tr:last-child td { border-bottom: 0; }
+    .tag { display: inline-block; border-radius: 10px; padding: 3px 10px; font-size: 15px; font-weight: 800; white-space: nowrap; }
+    .tag.recue { background: var(--soft); color: var(--secondary); }
+    .tag.cours { background: var(--amber-bg); color: var(--amber); }
+    .tag.traitee { background: var(--green-bg); color: var(--green); }
+    .tag.nb { background: var(--amber-bg); color: var(--amber); }
+    .groupe { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+    .vide { text-align: center; color: var(--muted); padding: 30px; }
+
+    /* Divers */
+    .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: #3a3a3a; color: #fff; padding: 16px 22px; border-radius: 14px;
+      font-weight: 700; z-index: 20; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+    .toast.erreur-t { background: var(--red); }
+    .chargement { position: fixed; inset: 0; background: rgba(250,248,243,.7); z-index: 15; display: flex; align-items: center; justify-content: center; }
+    .roue { width: 56px; height: 56px; border-radius: 50%; border: 6px solid var(--soft); border-top-color: var(--primary); animation: tourne .8s linear infinite; }
+    @keyframes tourne { to { transform: rotate(360deg); } }
+    .hors-ligne { background: var(--red-bg); color: var(--red); text-align: center; font-weight: 700; padding: 10px; }
+    @media (max-width: 860px) {
+      .ident { grid-template-columns: 1fr; }
+      .choix.grille { grid-template-columns: repeat(5, 1fr); }
+      .pave { grid-template-columns: repeat(4, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <header class="hdr">
+    <span class="logo-chip"><img src="../assets/logo-mutual.png" alt="Mutual Logistics"></span>
+    <span class="hdr-titre">Signaler un problème<small>Borne libre-service · Mutual Connect</small></span>
+    <span class="hdr-droite">
+      <span id="hdrCode" hidden>Bonjour <span class="code-actif" id="hdrCodeVal"></span></span>
+      <button type="button" class="pill blanc" id="btnDeconnexion" hidden onclick="deconnecter()">⏏ Me déconnecter</button>
+    </span>
+  </header>
+  <div class="hors-ligne" id="horsLigne" hidden>Pas de réseau : la remontée ne peut pas être envoyée pour l'instant.</div>
+
+  <main>
+    <!-- 0. INSTALLATION (une seule fois, par l'encadrement) -->
+    <section class="ecran" id="eInstall">
+      <div class="resultat">
+        <div class="rond">⚙</div>
+        <h2>Installation de la borne</h2>
+        <p>Saisir le code d'installation donné par l'éditeur Apps Script (fonction <b>initialiserBorne</b>).</p>
+        <input class="texte" id="installCode" maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="Code d'installation" style="text-align:center;margin-top:16px;font-size:24px;letter-spacing:3px;">
+        <div class="erreur" id="installErreur"></div>
+        <div class="barre-envoi"><button type="button" class="btn principal" onclick="installer()">Valider</button></div>
+      </div>
+    </section>
+
+    <!-- 1. IDENTIFICATION -->
+    <section class="ecran" id="eIdent">
+      <h1>Saisis ton code opérateur</h1>
+      <p class="sous">Exemple : FRLGA998 — il sert à prévenir l'encadrement, il n'est jamais affiché aux autres.</p>
+      <div class="ident">
+        <div class="ident-carte">
+          <div class="code-aff" id="codeAff"></div>
+          <div class="ok-format" id="codeEtat"></div>
+          <div class="barre-envoi" style="margin-top:14px;">
+            <button type="button" class="btn principal" id="btnContinuer" onclick="validerCode()" disabled>Continuer</button>
+          </div>
+          <div class="aide">Le code commence toujours par FR.</div>
+          <div class="barre-envoi" style="margin-top:18px;">
+            <button type="button" class="btn second large" onclick="ouvrirSuivi()">📋 Voir le suivi des remontées</button>
+          </div>
+        </div>
+        <div class="ident-carte">
+          <div class="clavier" id="clavier"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. ACCUEIL -->
+    <section class="ecran" id="eAccueil">
+      <h1>Que veux-tu signaler ?</h1>
+      <p class="sous">Touche la catégorie concernée.</p>
+      <div class="tuiles">
+        <button type="button" class="tuile" onclick="aller('eTechnique')"><span class="ico">🔧</span>Technique<small>Équipements, engins, portes…</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('pause')"><span class="ico">☕</span>Salle de pause<small>Micro-ondes, frigo, café…</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('chambre')"><span class="ico">❄️</span>Chambre<small>Plaque de glace</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('toilettes')"><span class="ico">🚻</span>Toilettes<small>Hommes / Femmes</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('vestiaire')"><span class="ico">🔐</span>Vestiaire<small>Hommes / Femmes</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('divers')"><span class="ico">✏️</span>Autre<small>J'écris moi-même</small></button>
+        <button type="button" class="tuile secondaire" onclick="ouvrirSuivi()"><span class="ico">📋</span>Suivi des remontées<small>Statut et commentaires</small></button>
+      </div>
+    </section>
+
+    <!-- 3. SOUS-MENU TECHNIQUE (formulaires existants de Mutual Connect, simplifiés) -->
+    <section class="ecran" id="eTechnique">
+      <button type="button" class="retour" onclick="aller('eAccueil')">← Retour</button>
+      <h1>Technique</h1>
+      <p class="sous">Choisis ce qui ne va pas.</p>
+      <div class="tuiles">
+        <button type="button" class="tuile" onclick="ouvrirForm('equipements')"><span class="ico">⚠️</span>Équipement abîmé<small>Lisse, montant, sabot…</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('engin')"><span class="ico">🚜</span>Engin en panne<small>Chariot, transpalette…</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('filmeuse')"><span class="ico">🌀</span>Filmeuse HS<small>F1 à F8</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('imprimante')"><span class="ico">🖨️</span>Imprimante HS<small>Allées 4, 8, 14, 18</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('porte')"><span class="ico">🚪</span>Porte<small>Sas, accès quais, quais</small></button>
+        <button type="button" class="tuile" onclick="ouvrirForm('autre')"><span class="ico">📝</span>Autre problème technique<small>J'écris moi-même</small></button>
+      </div>
+    </section>
+
+    <!-- 4. FORMULAIRE (construit selon le type) -->
+    <section class="ecran" id="eForm">
+      <button type="button" class="retour" id="formRetour">← Retour</button>
+      <h1 id="formTitre"></h1>
+      <div id="formCorps"></div>
+      <div class="erreur" id="formErreur"></div>
+      <div class="barre-envoi">
+        <button type="button" class="btn principal" id="btnEnvoyer" onclick="envoyer(false)">✓ Envoyer la remontée</button>
+      </div>
+    </section>
+
+    <!-- 5. RÉSULTAT -->
+    <section class="ecran" id="eResultat">
+      <div class="resultat">
+        <div class="rond" id="resRond">✓</div>
+        <h2 id="resTitre"></h2>
+        <p id="resTexte"></p>
+        <div id="resEncart"></div>
+        <div class="barre-envoi" id="resBoutons"></div>
+        <div class="compte" id="resCompte"></div>
+      </div>
+    </section>
+
+    <!-- 6. SUIVI ANONYMISÉ -->
+    <section class="ecran" id="eSuivi">
+      <button type="button" class="retour" id="suiviRetour">← Retour</button>
+      <h1>Suivi des remontées</h1>
+      <p class="sous" id="suiviSous">14 derniers jours · sans nom · mis à jour à chaque ouverture</p>
+      <div class="filtres" id="suiviFiltres">
+        <button type="button" aria-pressed="true" data-f="tout">Toutes</button>
+        <button type="button" aria-pressed="false" data-f="ouvertes">À traiter / en cours</button>
+        <button type="button" aria-pressed="false" data-f="Traitée">Traitées</button>
+      </div>
+      <table class="suivi">
+        <thead><tr><th style="width:14%">Date</th><th>Objet</th><th style="width:9%">Nb</th><th style="width:14%">Statut</th><th style="width:30%">Commentaire</th></tr></thead>
+        <tbody id="suiviCorps"><tr><td colspan="5" class="vide">Chargement…</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+
+  <div class="chargement" id="chargement" hidden><div class="roue"></div></div>
+
+  <script>
+  // ============================================================
+  // MUTUAL BORNE — tablette libre-service des opérateurs.
+  // Parle uniquement au doPost() de l'Apps Script Mutual Connect (Borne.gs).
+  // ============================================================
+  const EXEC_URL = 'https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec';
+  const MOTIF_CODE = /^FR[A-Z]{3}\d{2,3}$/;
+  const INACTIVITE_MS = 60000;      // déconnexion automatique sans action
+  const RETOUR_RESULTAT_S = 30;     // après une remontée : déconnexion auto en 30 s
+  const CLE_JETON = 'borne_jeton', CLE_LISTES = 'borne_listes';
+
+  // Listes par défaut (remplacées par celles du serveur dès la connexion)
+  let LISTES = lireStockage(CLE_LISTES) || {
+    equipements: ['Lisse', 'Montant', 'Sabot', 'Grille', 'Structure', 'Sac film', 'Sac carton'],
+    niveaux: ['Sol', '10', '20', '30', '40', '50', '60', '70'],
+    allees: Array.from({ length: 20 }, (_, i) => String(i + 1)),
+    filmeuses: ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'],
+    imprimantes: ['Allée 4', 'Allée 8', 'Allée 14', 'Allée 18'],
+    portes: [], engins: [],
+    pause: ['Micro-ondes HS', 'Frigo HS', 'Machine à café en panne', 'Distributeur en panne', 'Casse'],
+    chambre: ['Plaque de glace'],
+    toilettes: ['Toilette bouchée', 'Lunette cassée', 'Lavabo cassé', 'Distributeur de mouchoirs vide'],
+    vestiaire: ['Casier cassé', 'Armoire chauffage HS'],
+    cotes: ['Hommes', 'Femmes']
+  };
+
+  let jeton = localStorage.getItem(CLE_JETON) || '';
+  let codeOperateur = '';
+  let saisieCode = '';
+  let formType = null, valeurs = {}, cleEnvoi = '';
+  let minuteurInactivite = null, minuteurResultat = null, retourSuivi = 'eIdent';
+
+  function lireStockage(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function $(id) { return document.getElementById(id); }
+
+  // ----- Appel serveur (text/plain : pas de requête CORS préalable, que l'Apps Script ne gère pas) -----
+  async function appel(action, donnees) {
+    const corps = Object.assign({ jeton: jeton, action: action }, donnees || {});
+    const rep = await fetch(EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(corps), redirect: 'follow' });
+    const r = await rep.json();
+    if (r && r.code === 'JETON') { localStorage.removeItem(CLE_JETON); jeton = ''; aller('eInstall'); throw new Error(r.error); }
+    return r;
+  }
+  function chargement(on) { $('chargement').hidden = !on; }
+  function toast(msg, erreur) {
+    const t = document.createElement('div');
+    t.className = 'toast' + (erreur ? ' erreur-t' : '');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), erreur ? 5000 : 3000);
+  }
+
+  // ----- Navigation -----
+  function aller(id) {
+    document.querySelectorAll('.ecran').forEach(e => e.classList.toggle('actif', e.id === id));
+    window.scrollTo(0, 0);
+    const connecte = !!codeOperateur;
+    $('hdrCode').hidden = !connecte;
+    $('btnDeconnexion').hidden = !connecte;
+    $('hdrCodeVal').textContent = codeOperateur;
+    if (id !== 'eResultat') arreterMinuteurResultat();
+    relancerInactivite();
+  }
+
+  // ----- Installation -----
+  async function installer() {
+    const code = $('installCode').value.trim().toUpperCase();
+    if (!code) return;
+    jeton = code;
+    chargement(true);
+    try {
+      const r = await appel('config');
+      if (!r.success) throw new Error(r.error);
+      localStorage.setItem(CLE_JETON, jeton);
+      enregistrerListes(r.listes);
+      $('installErreur').textContent = '';
+      demarrerIdent();
+    } catch (e) {
+      jeton = '';
+      $('installErreur').textContent = "Code refusé ou réseau indisponible.";
+      aller('eInstall');
+    } finally { chargement(false); }
+  }
+  function enregistrerListes(l) {
+    if (l && l.engins) { LISTES = l; localStorage.setItem(CLE_LISTES, JSON.stringify(l)); }
+  }
+
+  // ----- Identification : FR + 3 lettres + 2 ou 3 chiffres -----
+  function demarrerIdent() {
+    codeOperateur = '';
+    saisieCode = '';
+    majClavier();
+    aller('eIdent');
+  }
+  function majClavier() {
+    const lettres = saisieCode.replace(/\d/g, '').length;
+    const modeLettres = lettres < 3;
+    const clavier = $('clavier');
+    clavier.className = 'clavier' + (modeLettres ? '' : ' chiffres');
+    const touches = modeLettres ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('') : '1234567890'.split('');
+    clavier.innerHTML = touches.map(t => `<button type="button" onclick="toucheCode('${t}')">${t}</button>`).join('')
+      + `<button type="button" class="action" onclick="toucheCode('⌫')">⌫ Effacer</button>`;
+    const complet = 'FR' + saisieCode;
+    $('codeAff').innerHTML = esc(complet) + '<span class="reste">' + (modeLettres ? '•••'.slice(lettres) + '••' : (saisieCode.length < 5 ? '••'.slice(saisieCode.length - 3) : '')) + '</span>';
+    const valide = MOTIF_CODE.test(complet);
+    $('btnContinuer').disabled = !valide;
+    $('codeEtat').textContent = valide ? '✓ Format valide' : (modeLettres ? 'Tape les 3 lettres de ton code' : 'Tape les chiffres (2 ou 3)');
+    $('codeEtat').style.color = valide ? '' : 'var(--muted)';
+  }
+  function toucheCode(t) {
+    if (t === '⌫') saisieCode = saisieCode.slice(0, -1);
+    else if (saisieCode.length < 6) saisieCode += t;
+    majClavier();
+    relancerInactivite();
+  }
+  async function validerCode() {
+    const code = 'FR' + saisieCode;
+    if (!MOTIF_CODE.test(code)) return;
+    codeOperateur = code;
+    aller('eAccueil');
+    // Rafraîchit les listes (engins, portes…) sans bloquer l'opérateur
+    appel('config').then(r => { if (r && r.success) enregistrerListes(r.listes); }).catch(() => {});
+  }
+  function deconnecter() {
+    codeOperateur = '';
+    formType = null;
+    demarrerIdent();
+  }
+
+  // ----- Inactivité : retour à l'identification -----
+  function relancerInactivite() {
+    clearTimeout(minuteurInactivite);
+    const actif = document.querySelector('.ecran.actif');
+    if (!actif || actif.id === 'eInstall' || (actif.id === 'eIdent' && !saisieCode)) return;
+    minuteurInactivite = setTimeout(deconnecter, INACTIVITE_MS);
+  }
+  ['pointerdown', 'keydown', 'input'].forEach(ev => document.addEventListener(ev, () => {
+    if (!document.querySelector('#eResultat.actif')) relancerInactivite();
+  }, true));
+
+  // ----- Formulaires -----
+  const FORMS = {
+    equipements: { titre: '⚠️ Équipement abîmé', retour: 'eTechnique', etapes: [
+      { titre: 'Quoi ?', champs: [{ nom: 'Type élément', type: 'choix', liste: 'equipements' }] },
+      { titre: 'Où ?', champs: [
+        { nom: 'Allées', label: 'Allée', type: 'grille', liste: 'allees' },
+        { nom: 'Emplacement', type: 'pave' },
+        { nom: 'Niveau', type: 'choix', liste: 'niveaux', optionnel: true }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: "Décris l'état de l'élément…" }] }
+    ]},
+    engin: { titre: '🚜 Engin en panne', retour: 'eTechnique', etapes: [
+      { titre: 'Quel engin ?', champs: [{ nom: 'Engin', type: 'engins' }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: 'Ce qui ne marche pas…' }] }
+    ]},
+    filmeuse: { titre: '🌀 Filmeuse HS', retour: 'eTechnique', etapes: [
+      { titre: 'Quelle filmeuse ?', champs: [{ nom: 'Filmeuse(s)', label: 'Filmeuse', type: 'choix', liste: 'filmeuses' }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: 'Ce qui ne marche pas…' }] }
+    ]},
+    imprimante: { titre: '🖨️ Imprimante HS', retour: 'eTechnique', etapes: [
+      { titre: 'Quelle imprimante ?', champs: [{ nom: 'Imprimante', type: 'choix', liste: 'imprimantes' }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: 'Ce qui ne marche pas…' }] }
+    ]},
+    porte: { titre: '🚪 Porte', retour: 'eTechnique', etapes: [
+      { titre: 'Quelle porte ?', champs: [{ nom: 'Porte', type: 'portes' }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: 'Ce qui ne marche pas…' }] }
+    ]},
+    autre: { titre: '📝 Autre problème technique', retour: 'eTechnique', etapes: [
+      { titre: 'Décris le problème', champs: [{ nom: 'Description', type: 'texte', aide: 'Quoi, où…' }] }
+    ]},
+    pause: { titre: '☕ Salle de pause', retour: 'eAccueil', etapes: [
+      { titre: 'Quoi ?', champs: [{ nom: 'Problème', type: 'choix', liste: 'pause' }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: 'Précision…' }] }
+    ]},
+    chambre: { titre: '❄️ Chambre', retour: 'eAccueil', etapes: [
+      { titre: 'Quoi ?', champs: [{ nom: 'Problème', type: 'choix', liste: 'chambre', defaut: 'Plaque de glace' }] },
+      { titre: 'Où ?', champs: [
+        { nom: 'Allées', label: 'Allée', type: 'grille', liste: 'allees' },
+        { nom: 'Emplacement', type: 'pave' }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: 'Précision…' }] }
+    ]},
+    toilettes: { titre: '🚻 Toilettes', retour: 'eAccueil', etapes: [
+      { titre: 'Lesquelles ?', champs: [{ nom: 'Côté', label: 'Toilettes', type: 'choix', liste: 'cotes' }] },
+      { titre: 'Quoi ?', champs: [{ nom: 'Problème', type: 'choix', liste: 'toilettes' }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: 'Précision…' }] }
+    ]},
+    vestiaire: { titre: '🔐 Vestiaire', retour: 'eAccueil', etapes: [
+      { titre: 'Lequel ?', champs: [{ nom: 'Côté', label: 'Vestiaire', type: 'choix', liste: 'cotes' }] },
+      { titre: 'Quoi ?', champs: [
+        { nom: 'Problème', type: 'choix', liste: 'vestiaire' },
+        { nom: 'N° casier', type: 'pave', optionnel: true, si: v => v['Problème'] === 'Casier cassé' }] },
+      { titre: 'Détails', champs: [{ nom: 'Description', type: 'texte', optionnel: true, aide: 'Précision…' }] }
+    ]},
+    divers: { titre: '✏️ Autre', retour: 'eAccueil', etapes: [
+      { titre: 'Où ?', champs: [{ nom: 'Lieu', type: 'ligne', optionnel: true, aide: 'Ex. : quai 3, parking, couloir…' }] },
+      { titre: 'Décris le problème', champs: [{ nom: 'Description', type: 'texte', aide: 'Quoi…' }] }
+    ]}
+  };
+
+  function ouvrirForm(type) {
+    formType = type;
+    valeurs = {};
+    cleEnvoi = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const def = FORMS[type];
+    def.etapes.forEach(e => e.champs.forEach(c => { if (c.defaut) valeurs[c.nom] = c.defaut; }));
+    $('formTitre').textContent = def.titre;
+    $('formRetour').onclick = () => aller(def.retour);
+    $('formErreur').textContent = '';
+    $('btnEnvoyer').disabled = false;
+    rendreForm();
+    aller('eForm');
+  }
+
+  function rendreForm() {
+    const def = FORMS[formType];
+    $('formCorps').innerHTML = def.etapes.map((etape, i) => {
+      const champs = etape.champs.filter(c => !c.si || c.si(valeurs));
+      if (!champs.length) return '';
+      return `<div class="etape"><div class="etape-titre"><span class="etape-num">${i + 1}</span>${esc(etape.titre)}</div>`
+        + champs.map(rendreChamp).join('') + '</div>';
+    }).join('');
+  }
+
+  function boutonsChoix(nom, liste, libelle) {
+    return liste.map(v => `<button type="button" aria-pressed="${valeurs[nom] === v}" data-nom="${esc(nom)}" data-val="${esc(v)}" onclick="choisir(this)">${esc(libelle ? libelle(v) : v)}</button>`).join('');
+  }
+
+  function rendreChamp(c) {
+    const lbl = `<div class="champ-lbl">${esc(c.label || c.nom)}${c.optionnel ? ' <span class="opt">(facultatif)</span>' : ''}</div>`;
+    if (c.type === 'choix') return lbl + `<div class="choix">${boutonsChoix(c.nom, LISTES[c.liste] || [])}</div>`;
+    if (c.type === 'grille') return lbl + `<div class="choix grille">${boutonsChoix(c.nom, LISTES[c.liste] || [])}</div>`;
+    if (c.type === 'engins') return groupesEngins(c.nom);
+    if (c.type === 'portes') return groupesPortes(c.nom);
+    if (c.type === 'pave') {
+      const v = valeurs[c.nom] || '';
+      return lbl + `<div class="afficheur${v ? '' : ' vide'}" id="aff_${slug(c.nom)}">${v ? esc(v) : 'Tape le numéro'}</div>`
+        + `<div class="pave">${'1234567890'.split('').map(d => `<button type="button" onclick="pave('${esc(c.nom)}','${d}')">${d}</button>`).join('')}`
+        + `<button type="button" onclick="pave('${esc(c.nom)}','⌫')">⌫</button></div>`;
+    }
+    if (c.type === 'ligne') return lbl + `<input class="texte" maxlength="80" data-nom="${esc(c.nom)}" oninput="saisie(this)" placeholder="${esc(c.aide || '')}" value="${esc(valeurs[c.nom] || '')}">`;
+    return lbl + `<textarea maxlength="400" data-nom="${esc(c.nom)}" oninput="saisie(this)" placeholder="${esc(c.aide || '')}">${esc(valeurs[c.nom] || '')}</textarea>`;
+  }
+  function slug(s) { return s.replace(/[^a-z0-9]/gi, ''); }
+
+  const GROUPES_ENGINS = [
+    { prefixe: 'R', titre: 'Caristes' }, { prefixe: 'Q', titre: 'Réception / Expédition' }, { prefixe: 'P', titre: 'Préparations' },
+    { prefixe: 'Loc simple', titre: 'Location simple' }, { prefixe: 'G', titre: 'Gerbeurs' }, { prefixe: 'N', titre: 'Nacelle' }
+  ];
+  function groupesEngins(nom) {
+    const restants = (LISTES.engins || []).slice();
+    return GROUPES_ENGINS.map(g => {
+      const ids = restants.filter(id => id.indexOf(g.prefixe) === 0 && (g.prefixe !== 'P' || /^P\d/.test(id)));
+      ids.forEach(id => restants.splice(restants.indexOf(id), 1));
+      if (!ids.length) return '';
+      return `<div class="groupe-titre">${esc(g.titre)}</div><div class="choix">`
+        + boutonsChoix(nom, ids, id => id.replace(/^GRouge$/, 'Gerbeur rouge').replace(/^GJaune$/, 'Gerbeur jaune').replace(/^Loc simple/, 'Loc ')) + '</div>';
+    }).join('');
+  }
+  function groupesPortes(nom) {
+    const portes = LISTES.portes || [];
+    const sas = portes.filter(p => p.indexOf('Porte de quai') !== 0);
+    const quais = portes.filter(p => p.indexOf('Porte de quai') === 0);
+    return `<div class="groupe-titre">Sas et accès quais</div><div class="choix">${boutonsChoix(nom, sas, p => p.replace(/^Porte (\d) – /, 'P$1 · ').replace(/[()]/g, ''))}</div>`
+      + `<div class="groupe-titre">Portes de quai</div><div class="choix">${boutonsChoix(nom, quais, p => p.replace('Porte de quai ', 'Quai '))}</div>`;
+  }
+
+  function choisir(btn) {
+    const nom = btn.dataset.nom;
+    valeurs[nom] = btn.dataset.val;
+    document.querySelectorAll(`#formCorps button[data-nom="${CSS.escape(nom)}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    $('formErreur').textContent = '';
+    // Champ conditionnel (n° de casier) : on redessine
+    if (FORMS[formType].etapes.some(e => e.champs.some(c => c.si))) {
+      const y = window.scrollY; rendreForm(); window.scrollTo(0, y);
+    }
+  }
+  function pave(nom, d) {
+    let v = valeurs[nom] || '';
+    v = d === '⌫' ? v.slice(0, -1) : (v.length < 6 ? v + d : v);
+    valeurs[nom] = v;
+    const aff = $('aff_' + slug(nom));
+    aff.textContent = v || 'Tape le numéro';
+    aff.classList.toggle('vide', !v);
+    $('formErreur').textContent = '';
+  }
+  function saisie(el) { valeurs[el.dataset.nom] = el.value; $('formErreur').textContent = ''; }
+
+  // ----- Envoi -----
+  async function envoyer(confirmerDoublon) {
+    const def = FORMS[formType];
+    const champs = {};
+    let manquant = null;
+    def.etapes.forEach(e => e.champs.forEach(c => {
+      if (c.si && !c.si(valeurs)) return;
+      const v = String(valeurs[c.nom] || '').trim();
+      if (v) champs[c.nom] = v;
+      else if (!c.optionnel && !manquant) manquant = c.label || c.nom;
+    }));
+    if (manquant) { $('formErreur').textContent = '« ' + manquant + ' » est obligatoire.'; return; }
+    if (!navigator.onLine) { toast('Pas de réseau. Réessaie dans un instant.', true); return; }
+    $('btnEnvoyer').disabled = true;
+    chargement(true);
+    try {
+      const r = await appel('envoyer', { code: codeOperateur, type: formType, champs: champs, confirmerDoublon: !!confirmerDoublon,
+                                         cleEnvoi: cleEnvoi + (confirmerDoublon ? '_d' : '') });
+      if (!r.success) throw new Error(r.error || 'Envoi impossible.');
+      afficherResultat(r);
+    } catch (e) {
+      $('formErreur').textContent = (e && e.message) || 'Envoi impossible. Réessaie.';
+      aller('eForm');
+    } finally {
+      chargement(false);
+      $('btnEnvoyer').disabled = false;
+    }
+  }
+
+  function afficherResultat(r) {
+    const ex = r.existant || {};
+    const encart = ex.objet ? `<div class="encart"><b>${esc(ex.objet)}</b>Signalé le ${esc(ex.quand)} · ${esc(ex.statut)}`
+      + (ex.nb > 1 ? ` · ${ex.nb} signalements` : '') + (ex.commentaire ? `<br>💬 ${esc(ex.commentaire)}` : '') + '</div>' : '';
+    const finaux = `<button type="button" class="btn second large" onclick="nouvelleRemontee()">＋ Autre remontée</button>`
+                 + `<button type="button" class="btn principal large" onclick="deconnecter()">⏏ Me déconnecter</button>`;
+    $('resRond').className = 'rond';
+    $('resEncart').innerHTML = '';
+    if (r.statut === 'doublon') {
+      $('resRond').className = 'rond ambre'; $('resRond').textContent = '🔁';
+      $('resTitre').textContent = 'Déjà signalé';
+      $('resTexte').textContent = "Quelqu'un a déjà fait cette remontée. Tu peux ajouter ton signalement : l'encadrement saura que vous êtes plusieurs.";
+      $('resEncart').innerHTML = encart;
+      $('resBoutons').innerHTML = `<button type="button" class="btn second large" onclick="aller('eForm')">Annuler</button>`
+        + `<button type="button" class="btn principal large" onclick="envoyer(true)">J'ajoute mon signalement</button>`;
+      $('resCompte').textContent = '';
+      aller('eResultat');
+      return;
+    }
+    if (r.statut === 'deja_signale') {
+      $('resRond').className = 'rond ambre'; $('resRond').textContent = 'ℹ';
+      $('resTitre').textContent = 'Tu as déjà signalé ce problème';
+      $('resTexte').textContent = "Ta remontée est bien enregistrée, pas besoin de la refaire.";
+      $('resEncart').innerHTML = encart;
+    } else if (r.statut === 'doublon_ajoute') {
+      $('resRond').textContent = '✓';
+      $('resTitre').textContent = 'Signalement ajouté';
+      $('resTexte').textContent = 'Merci ! Ce problème a maintenant ' + (ex.nb || 2) + ' signalements.';
+      $('resEncart').innerHTML = encart;
+    } else {
+      $('resRond').textContent = '✓';
+      $('resTitre').textContent = 'Remontée envoyée';
+      $('resTexte').textContent = (r.objet || '') + ' — merci !';
+    }
+    $('resBoutons').innerHTML = finaux;
+    aller('eResultat');
+    lancerMinuteurResultat();
+  }
+  function nouvelleRemontee() { aller('eAccueil'); }
+
+  function lancerMinuteurResultat() {
+    arreterMinuteurResultat();
+    let s = RETOUR_RESULTAT_S;
+    const maj = () => { $('resCompte').textContent = 'Déconnexion automatique dans ' + s + ' s'; };
+    maj();
+    minuteurResultat = setInterval(() => { s--; if (s <= 0) { arreterMinuteurResultat(); deconnecter(); } else maj(); }, 1000);
+  }
+  function arreterMinuteurResultat() { clearInterval(minuteurResultat); minuteurResultat = null; $('resCompte').textContent = ''; }
+
+  // ----- Suivi anonymisé -----
+  let suiviLignes = [], suiviFiltre = 'tout';
+  async function ouvrirSuivi() {
+    retourSuivi = codeOperateur ? 'eAccueil' : 'eIdent';
+    $('suiviRetour').onclick = () => aller(retourSuivi);
+    $('suiviCorps').innerHTML = '<tr><td colspan="5" class="vide">Chargement…</td></tr>';
+    aller('eSuivi');
+    try {
+      const r = await appel('suivi');
+      if (!r.success) throw new Error(r.error);
+      suiviLignes = r.lignes || [];
+      $('suiviSous').textContent = '14 derniers jours · sans nom · mis à jour à ' + (r.maj || '');
+      rendreSuivi();
+    } catch (e) {
+      $('suiviCorps').innerHTML = '<tr><td colspan="5" class="vide">Suivi indisponible (réseau ?). Réessaie.</td></tr>';
+    }
+  }
+  document.querySelectorAll('#suiviFiltres button').forEach(b => b.addEventListener('click', () => {
+    suiviFiltre = b.dataset.f;
+    document.querySelectorAll('#suiviFiltres button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    rendreSuivi();
+  }));
+  function rendreSuivi() {
+    const lignes = suiviLignes.filter(l => suiviFiltre === 'tout' || (suiviFiltre === 'ouvertes' ? l.statut !== 'Traitée' : l.statut === suiviFiltre));
+    if (!lignes.length) { $('suiviCorps').innerHTML = '<tr><td colspan="5" class="vide">Aucune remontée.</td></tr>'; return; }
+    const classe = { 'Reçue': 'recue', 'En cours': 'cours', 'Traitée': 'traitee' };
+    $('suiviCorps').innerHTML = lignes.map(l => `<tr>
+        <td>${esc(l.quand)}</td>
+        <td><b>${esc(l.objet)}</b><span class="groupe">${esc(l.groupe)}</span></td>
+        <td>${l.nb > 1 ? `<span class="tag nb">×${l.nb}</span>` : '×1'}</td>
+        <td><span class="tag ${classe[l.statut] || 'recue'}">${esc(l.statut)}</span></td>
+        <td>${l.commentaire ? esc(l.commentaire) : '<span style="color:#b5aa94">—</span>'}</td></tr>`).join('');
+  }
+
+  // ----- Réseau, démarrage -----
+  function majReseau() { $('horsLigne').hidden = navigator.onLine; }
+  window.addEventListener('online', majReseau);
+  window.addEventListener('offline', majReseau);
+  majReseau();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (jeton) demarrerIdent(); else aller('eInstall');
+  </script>
+</body>
+</html>
