@@ -91,9 +91,10 @@
     .code-aff { font-family: ui-monospace, Menlo, monospace; font-size: 40px; font-weight: 800; letter-spacing: 6px; text-align: center; padding: 18px 10px;
       border-radius: 14px; border: 2px solid var(--line); background: var(--bg); min-height: 92px; }
     .code-aff .reste { color: #cfc5ae; }
-    .clavier { display: grid; gap: 8px; grid-template-columns: repeat(7, 1fr); }
-    .clavier.chiffres { grid-template-columns: repeat(5, 1fr); }
-    .clavier button { min-height: 66px; border-radius: 12px; border: 2px solid var(--line); background: #fff; font-size: 24px; font-weight: 800; }
+    .clavier { display: grid; gap: 7px; grid-template-columns: repeat(10, 1fr); }
+    .clavier .chiffre { background: var(--bg); }
+    .clavier .large { grid-column: span 4; }
+    .clavier button { min-height: 62px; padding: 0; border-radius: 12px; border: 2px solid var(--line); background: #fff; font-size: 24px; font-weight: 800; }
     .clavier button.action { background: var(--soft); font-size: 18px; }
     .clavier button:active { background: var(--sel); }
     .aide { font-size: 15px; color: var(--muted); margin-top: 10px; text-align: center; }
@@ -146,7 +147,7 @@
     <span class="logo-chip"><img src="../assets/logo-mutual.png" alt="Mutual Logistics"></span>
     <span class="hdr-titre">Signaler un problème<small>Borne libre-service · Mutual Connect</small></span>
     <span class="hdr-droite">
-      <span id="hdrCode" hidden>Bonjour <span class="code-actif" id="hdrCodeVal"></span></span>
+      <span id="hdrCode" hidden>Bonjour <b id="hdrCodeVal"></b></span>
       <button type="button" class="pill blanc" id="btnDeconnexion" hidden onclick="deconnecter()">⏏ Me déconnecter</button>
     </span>
   </header>
@@ -168,7 +169,7 @@
     <!-- 1. IDENTIFICATION -->
     <section class="ecran" id="eIdent">
       <h1>Saisis ton code opérateur</h1>
-      <p class="sous">FR + 3 lettres + 2 ou 3 chiffres — il sert à prévenir l'encadrement, il n'est jamais affiché aux autres.</p>
+      <p class="sous">Le même code que sur ton terminal. Il sert à prévenir l'encadrement, il n'est jamais affiché aux autres.</p>
       <div class="ident">
         <div class="ident-carte">
           <div class="code-aff" id="codeAff"></div>
@@ -176,7 +177,7 @@
           <div class="barre-envoi" style="margin-top:14px;">
             <button type="button" class="btn principal" id="btnContinuer" onclick="validerCode()" disabled>Continuer</button>
           </div>
-          <div class="aide">Le code commence toujours par FR.</div>
+          <div class="aide">Code oublié ? Demande à ton chef d'équipe.</div>
           <div class="barre-envoi" style="margin-top:18px;">
             <button type="button" class="btn second large" onclick="ouvrirSuivi()">📋 Voir le suivi des remontées</button>
           </div>
@@ -265,7 +266,7 @@
   // Parle uniquement au doPost() de l'Apps Script Mutual Connect (Borne.gs).
   // ============================================================
   const EXEC_URL = 'https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec';
-  const MOTIF_CODE = /^FR[A-Z]{3}\d{2,3}$/;
+  const MOTIF_CODE = /^[A-Z0-9]{2,16}$/; // vérifié ensuite par le serveur (liste des opérateurs)
   const INACTIVITE_MS = 60000;      // déconnexion automatique sans action
   const RETOUR_RESULTAT_S = 30;     // après une remontée : déconnexion auto en 30 s
   const CLE_JETON = 'borne_jeton', CLE_LISTES = 'borne_listes';
@@ -286,7 +287,7 @@
   };
 
   let jeton = localStorage.getItem(CLE_JETON) || '';
-  let codeOperateur = '';
+  let codeOperateur = '', nomOperateur = '';
   let saisieCode = '';
   let formType = null, valeurs = {}, cleEnvoi = '';
   let minuteurInactivite = null, minuteurResultat = null, retourSuivi = 'eIdent';
@@ -319,7 +320,7 @@
     const connecte = !!codeOperateur;
     $('hdrCode').hidden = !connecte;
     $('btnDeconnexion').hidden = !connecte;
-    $('hdrCodeVal').textContent = codeOperateur;
+    $('hdrCodeVal').textContent = nomOperateur;
     if (id !== 'eResultat') arreterMinuteurResultat();
     relancerInactivite();
   }
@@ -347,44 +348,58 @@
     if (l && l.engins) { LISTES = l; localStorage.setItem(CLE_LISTES, JSON.stringify(l)); }
   }
 
-  // ----- Identification : FR + 3 lettres + 2 ou 3 chiffres -----
+  // ----- Identification : code opérateur vérifié par le serveur, puis nom affiché -----
   function demarrerIdent() {
-    codeOperateur = '';
+    codeOperateur = ''; nomOperateur = '';
     saisieCode = '';
     majClavier();
     aller('eIdent');
   }
+  const RANGEES_CLAVIER = ['1234567890', 'AZERTYUIOP', 'QSDFGHJKLM', 'WXCVBN'];
   function majClavier() {
-    const lettres = saisieCode.replace(/\d/g, '').length;
-    const modeLettres = lettres < 3;
     const clavier = $('clavier');
-    clavier.className = 'clavier' + (modeLettres ? '' : ' chiffres');
-    const touches = modeLettres ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('') : '1234567890'.split('');
-    clavier.innerHTML = touches.map(t => `<button type="button" onclick="toucheCode('${t}')">${t}</button>`).join('')
-      + `<button type="button" class="action" onclick="toucheCode('⌫')">⌫ Effacer</button>`;
-    const complet = 'FR' + saisieCode;
-    $('codeAff').innerHTML = esc(complet) + '<span class="reste">' + (modeLettres ? '•••'.slice(lettres) + '••' : (saisieCode.length < 5 ? '••'.slice(saisieCode.length - 3) : '')) + '</span>';
-    const valide = MOTIF_CODE.test(complet);
-    $('btnContinuer').disabled = !valide;
-    $('codeEtat').textContent = valide ? '✓ Format valide' : (modeLettres ? 'Tape les 3 lettres de ton code' : 'Tape les chiffres (2 ou 3)');
-    $('codeEtat').style.color = valide ? '' : 'var(--muted)';
+    if (!clavier.children.length) {
+      clavier.innerHTML = RANGEES_CLAVIER.map((r, i) => r.split('').map(t =>
+          `<button type="button"${i === 0 ? ' class="chiffre"' : ''} onclick="toucheCode('${t}')">${t}</button>`).join('')).join('')
+        + `<button type="button" class="action large" onclick="toucheCode('⌫')">⌫ Effacer</button>`;
+    }
+    $('codeAff').innerHTML = saisieCode ? esc(saisieCode) : '<span class="reste">Ton code</span>';
+    $('btnContinuer').disabled = !MOTIF_CODE.test(saisieCode);
+    $('codeEtat').textContent = '';
   }
   function toucheCode(t) {
     if (t === '⌫') saisieCode = saisieCode.slice(0, -1);
-    else if (saisieCode.length < 6) saisieCode += t;
+    else if (saisieCode.length < 16) saisieCode += t;
     majClavier();
     relancerInactivite();
   }
   async function validerCode() {
-    const code = 'FR' + saisieCode;
+    const code = saisieCode;
     if (!MOTIF_CODE.test(code)) return;
-    codeOperateur = code;
-    aller('eAccueil');
-    // Rafraîchit les listes (engins, portes…) sans bloquer l'opérateur
-    appel('config').then(r => { if (r && r.success) enregistrerListes(r.listes); }).catch(() => {});
+    $('btnContinuer').disabled = true;
+    chargement(true);
+    try {
+      const r = await appel('verifierCode', { code: code });
+      if (!r.success) {
+        $('codeEtat').textContent = r.error || 'Code inconnu.';
+        $('codeEtat').style.color = 'var(--red)';
+        return;
+      }
+      codeOperateur = code;
+      nomOperateur = r.nom || '';
+      aller('eAccueil');
+      // Rafraîchit les listes (engins, portes…) sans bloquer l'opérateur
+      appel('config').then(x => { if (x && x.success) enregistrerListes(x.listes); }).catch(() => {});
+    } catch (e) {
+      $('codeEtat').textContent = (e && e.message) || 'Pas de réseau. Réessaie.';
+      $('codeEtat').style.color = 'var(--red)';
+    } finally {
+      chargement(false);
+      $('btnContinuer').disabled = !MOTIF_CODE.test(saisieCode);
+    }
   }
   function deconnecter() {
-    codeOperateur = '';
+    codeOperateur = ''; nomOperateur = '';
     formType = null;
     demarrerIdent();
   }
