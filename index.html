@@ -75,6 +75,14 @@
 
     #offline button { min-height:56px; padding:0 32px; border:0; border-radius:12px;
                       background:var(--primary); color:#fff; font:600 18px system-ui, sans-serif; }
+    /* Scan de code-barres : caméra ouverte par la page installée (l'iframe Apps Script n'y a pas accès) */
+    #scanCam { display:none; position:fixed; inset:0; z-index:50; background:rgba(20,16,10,.94); flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:18px; }
+    #scanCam .cadre { position:relative; width:min(94vw,760px); aspect-ratio:4/3; border-radius:16px; overflow:hidden; background:#000; }
+    #scanCam video { width:100%; height:100%; object-fit:cover; }
+    #scanCam .viseur { position:absolute; left:7%; right:7%; top:36%; bottom:36%; border:3px solid var(--primary); border-radius:10px; box-shadow:0 0 0 2000px rgba(0,0,0,.28); }
+    #scanCam p { color:#fff; font:700 17px system-ui, sans-serif; margin:0; text-align:center; }
+    #scanCam .info { color:#e9dcc0; font:500 14px system-ui, sans-serif; min-height:18px; }
+    #scanCam button { min-height:54px; padding:0 34px; border-radius:12px; border:0; background:#f0ebe0; color:var(--text); font:800 17px system-ui, sans-serif; }
   </style>
 </head>
 <body>
@@ -110,6 +118,12 @@
     <button onclick="location.reload()">Réessayer</button>
   </div>
 
+  <div id="scanCam" role="dialog" aria-modal="true" aria-label="Scanner un code-barres">
+    <div class="cadre"><video id="scanVideo" playsinline muted autoplay></video><div class="viseur"></div></div>
+    <p>Visez le code-barres de l'étiquette : il est lu tout seul.</p>
+    <div class="info" id="scanInfo"></div>
+    <button type="button" onclick="scanFermer(true)">Annuler</button>
+  </div>
   <div id="pushAsk" role="dialog" aria-modal="true" aria-labelledby="pushAskTitre">
     <div class="box">
       <div class="ico">🔔</div>
@@ -251,6 +265,88 @@
       pushAsk.style.display = 'flex';
     }
     function pushPlusTard() { pushAsk.style.display = 'none'; pushEtat(); }
+
+    // ===== SCAN DE CODE-BARRES =====
+    // La caméra est ouverte ici (page installée) car l'iframe Apps Script n'y a pas accès.
+    //   appli → { mc:'scan', action:'ouvrir', motif }   (motif : expression du code attendu)
+    //   page  → { mc:'scan', etat:'ouvert' } puis { mc:'scan', code } | { mc:'scan', annule:true } | { mc:'scan', erreur }
+    const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+    let scanWin = null, scanOrigin = null, scanFlux = null, scanMinut = null, scanTour = 0, scanMotif = null, zxingP = null, zxLecteur = null;
+    const scanEnvoyer = msg => { if (scanWin) scanWin.postMessage(Object.assign({ mc: 'scan' }, msg), scanOrigin); };
+    function chargerZxing() {
+      if (window.ZXing) return Promise.resolve();
+      if (!zxingP) zxingP = new Promise((ok, ko) => {
+        const sc = document.createElement('script'); sc.src = ZXING_URL; sc.onload = ok;
+        sc.onerror = () => { zxingP = null; ko(new Error('lecteur non chargé')); };
+        document.head.appendChild(sc);
+      });
+      return zxingP;
+    }
+    function zxDecoder(video, tourne) {
+      if (!zxLecteur) {
+        zxLecteur = new ZXing.MultiFormatReader();
+        const o = new Map(); o.set(ZXing.DecodeHintType.TRY_HARDER, true); zxLecteur.setHints(o);
+      }
+      const r = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+      const w = Math.round(video.videoWidth * r), h = Math.round(video.videoHeight * r);
+      const t = document.createElement('canvas');
+      t.width = tourne ? h : w; t.height = tourne ? w : h;
+      const c = t.getContext('2d');
+      if (tourne) { c.translate(h, 0); c.rotate(Math.PI / 2); }
+      c.drawImage(video, 0, 0, w, h);
+      try { return zxLecteur.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(t)))).getText(); }
+      catch (e) { return null; }
+    }
+    function scanFermer(annule) {
+      clearTimeout(scanMinut);
+      if (scanFlux) scanFlux.getTracks().forEach(t => t.stop());
+      scanFlux = null;
+      document.getElementById('scanCam').style.display = 'none';
+      if (annule) scanEnvoyer({ annule: true });
+    }
+    async function scanOuvrir() {
+      if (scanFlux) return;
+      const info = document.getElementById('scanInfo');
+      info.textContent = '';
+      try {
+        scanFlux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+      } catch (err) {
+        scanFlux = null;
+        return scanEnvoyer({ erreur: err && err.name === 'NotAllowedError' ? 'Accès à la caméra refusé : autorisez-le dans les réglages de Chrome.' : 'Caméra indisponible.' });
+      }
+      const video = document.getElementById('scanVideo');
+      video.srcObject = scanFlux;
+      document.getElementById('scanCam').style.display = 'flex';
+      scanEnvoyer({ etat: 'ouvert' });
+      try { await video.play(); } catch (e) {}
+      const detecteur = 'BarcodeDetector' in window ? new BarcodeDetector() : null;
+      try { await chargerZxing(); } catch (e) { if (!detecteur) { scanFermer(false); return scanEnvoyer({ erreur: 'Lecteur de code-barres non chargé (réseau ?).' }); } }
+      const analyser = async () => {
+        if (!scanFlux) return;
+        let codes = [];
+        try { if (detecteur) codes = (await detecteur.detect(video)).map(c => c.rawValue); } catch (e) {}
+        if (!codes.length && window.ZXing && video.videoWidth) { const t = zxDecoder(video, (scanTour++) % 2 === 1); if (t) codes = [t]; }
+        const bon = codes.find(c => !scanMotif || scanMotif.test(String(c).toUpperCase().replace(/[\s-]/g, '')));
+        if (bon) {
+          if (navigator.vibrate) navigator.vibrate(80);
+          scanFermer(false);
+          return scanEnvoyer({ code: String(bon) });
+        }
+        if (codes.length) info.textContent = 'Code lu mais pas une étiquette d\'emplacement : ' + codes[0];
+        scanMinut = setTimeout(analyser, 120);
+      };
+      analyser();
+    }
+    addEventListener('message', e => {
+      if (!e.data || e.data.mc !== 'scan' || !origineAppli(e.origin)) return;
+      scanWin = e.source; scanOrigin = e.origin;
+      if (e.data.action === 'ouvrir') {
+        try { scanMotif = e.data.motif ? new RegExp(e.data.motif) : null; } catch (err) { scanMotif = null; }
+        scanOuvrir();
+      }
+      if (e.data.action === 'fermer') scanFermer(false);
+    });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && scanFlux) scanFermer(true); });
 
     addEventListener('message', e => {
       if (!e.data || e.data.mc !== 'push' || !origineAppli(e.origin)) return;
