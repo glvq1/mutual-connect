@@ -127,6 +127,17 @@
     .groupe { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
     .vide { text-align: center; color: var(--muted); padding: 30px; }
 
+    /* Vêtements */
+    .panier { background: var(--soft); border-radius: 14px; padding: 12px 16px; margin-bottom: 16px; }
+    .panier-titre { font-weight: 800; margin-bottom: 6px; }
+    .panier-ligne { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid var(--line); }
+    .panier-ligne:first-of-type { border-top: 0; }
+    .panier-ligne button { min-height: 48px; padding: 0 16px; border-radius: 12px; border: 2px solid var(--line); background: #fff; color: var(--red); font-weight: 700; }
+    .demande { background: #fff; border: 2px solid var(--line); border-radius: 16px; padding: 14px 18px; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+    .demande b { display: block; font-size: 19px; }
+    .demande small { display: block; color: var(--muted); font-size: 15px; margin-top: 4px; }
+    .tag.prete { background: var(--amber-bg); color: var(--amber); }
+
     /* Divers */
     .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: #3a3a3a; color: #fff; padding: 16px 22px; border-radius: 14px;
       font-weight: 700; z-index: 20; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
@@ -190,8 +201,8 @@
 
     <!-- 2. ACCUEIL -->
     <section class="ecran" id="eAccueil">
-      <h1>Que veux-tu signaler ?</h1>
-      <p class="sous">Touche la catégorie concernée.</p>
+      <h1>Que veux-tu faire ?</h1>
+      <p class="sous">Signale un problème ou demande des vêtements de travail.</p>
       <div class="tuiles">
         <button type="button" class="tuile" onclick="aller('eTechnique')"><span class="ico">🔧</span>Technique<small>Équipements, engins, portes…</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('pause')"><span class="ico">☕</span>Salle de pause<small>Micro-ondes, frigo, café…</small></button>
@@ -199,6 +210,8 @@
         <button type="button" class="tuile" onclick="ouvrirForm('toilettes')"><span class="ico">🚻</span>Toilettes<small>Hommes / Femmes</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('vestiaire')"><span class="ico">🔐</span>Vestiaire<small>Hommes / Femmes</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('divers')"><span class="ico">✏️</span>Autre<small>J'écris moi-même</small></button>
+        <button type="button" class="tuile" onclick="ouvrirVetements()"><span class="ico">🧤</span>Vêtements<small>Bottes, gants, bonnet…</small></button>
+        <button type="button" class="tuile secondaire" onclick="ouvrirMesDemandes()"><span class="ico">📦</span>Mes demandes<small>Vêtements · visible par toi seul</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirSuivi()"><span class="ico">📋</span>Suivi des remontées<small>Statut et commentaires</small></button>
       </div>
     </section>
@@ -239,6 +252,28 @@
         <div class="barre-envoi" id="resBoutons"></div>
         <div class="compte" id="resCompte"></div>
       </div>
+    </section>
+
+    <!-- 7. DEMANDE DE VÊTEMENTS (panier de 1 à 6 articles) -->
+    <section class="ecran" id="eVet">
+      <button type="button" class="retour" onclick="aller('eAccueil')">← Retour</button>
+      <h1>🧤 Demande de vêtements</h1>
+      <p class="sous">Ajoute un ou plusieurs articles, puis envoie la demande.</p>
+      <div id="vetPanier"></div>
+      <div id="vetCorps"></div>
+      <div class="erreur" id="vetErreur"></div>
+      <div class="barre-envoi">
+        <button type="button" class="btn second large" onclick="vetAjouter()">＋ Ajouter un autre article</button>
+        <button type="button" class="btn principal" id="btnVetEnvoyer" onclick="vetEnvoyer()">✓ Envoyer la demande</button>
+      </div>
+    </section>
+
+    <!-- 8. MES DEMANDES (privé : seulement celles du code connecté) -->
+    <section class="ecran" id="eMesDem">
+      <button type="button" class="retour" onclick="aller('eAccueil')">← Retour</button>
+      <h1>Mes demandes de vêtements</h1>
+      <p class="sous">30 derniers jours · visible seulement avec ton code</p>
+      <div id="mesDemCorps"><div class="vide">Chargement…</div></div>
     </section>
 
     <!-- 6. SUIVI ANONYMISÉ -->
@@ -285,6 +320,22 @@
     vestiaire: ['Casier cassé', 'Armoire chauffage HS'],
     cotes: ['Hommes', 'Femmes']
   };
+
+  // [VÊTEMENTS] Catalogue par défaut (remplacé par celui du serveur, Vetements.gs)
+  const CLE_VET = 'borne_vetements';
+  const POINTURES = Array.from({ length: 13 }, (_, i) => String(36 + i));
+  let VETEMENTS = lireStockage(CLE_VET) || [
+    { article: 'Bottes', modeles: [{ nom: 'Cuir', tailles: POINTURES }, { nom: 'Tissu', tailles: POINTURES }] },
+    { article: 'Gants', modeles: [
+      { nom: 'Gants jaunes', tailles: ['7', '8', '9', '10', '11'] }, { nom: 'Moufles', tailles: ['M', 'L', 'XL'] },
+      { nom: 'Gants rouges', tailles: ['M', 'L', 'XL'] }, { nom: 'Ninja noir', tailles: ['8', '9', '10'] },
+      { nom: 'Tegera blanc/vert', tailles: ['8', '9', '10'] }] },
+    { article: 'Sous-gants', modeles: [{ nom: 'Décathlon', tailles: [] }, { nom: 'Laine', tailles: [] }] },
+    { article: 'Bonnet', modeles: null }
+  ];
+  const VET_ICONES = { 'Bottes': '🥾', 'Gants': '🧤', 'Sous-gants': '🧶', 'Bonnet': '🧢' };
+  const VET_MAX = 6;
+  let vetSel = {}, vetPanier = [], vetCle = '';
 
   let jeton = localStorage.getItem(CLE_JETON) || '';
   let codeOperateur = '', nomOperateur = '';
@@ -336,6 +387,7 @@
       if (!r.success) throw new Error(r.error);
       localStorage.setItem(CLE_JETON, jeton);
       enregistrerListes(r.listes);
+      enregistrerVetements(r.vetements);
       $('installErreur').textContent = '';
       demarrerIdent();
     } catch (e) {
@@ -346,6 +398,9 @@
   }
   function enregistrerListes(l) {
     if (l && l.engins) { LISTES = l; localStorage.setItem(CLE_LISTES, JSON.stringify(l)); }
+  }
+  function enregistrerVetements(v) {
+    if (Array.isArray(v) && v.length) { VETEMENTS = v; localStorage.setItem(CLE_VET, JSON.stringify(v)); }
   }
 
   // ----- Identification : code opérateur vérifié par le serveur, puis nom affiché -----
@@ -389,7 +444,7 @@
       nomOperateur = r.nom || '';
       aller('eAccueil');
       // Rafraîchit les listes (engins, portes…) sans bloquer l'opérateur
-      appel('config').then(x => { if (x && x.success) enregistrerListes(x.listes); }).catch(() => {});
+      appel('config').then(x => { if (x && x.success) { enregistrerListes(x.listes); enregistrerVetements(x.vetements); } }).catch(() => {});
     } catch (e) {
       $('codeEtat').textContent = (e && e.message) || 'Pas de réseau. Réessaie.';
       $('codeEtat').style.color = 'var(--red)';
@@ -401,6 +456,7 @@
   function deconnecter() {
     codeOperateur = ''; nomOperateur = '';
     formType = null;
+    vetSel = {}; vetPanier = [];
     demarrerIdent();
   }
 
@@ -686,6 +742,126 @@
     minuteurResultat = setInterval(() => { s--; if (s <= 0) { arreterMinuteurResultat(); deconnecter(); } else maj(); }, 1000);
   }
   function arreterMinuteurResultat() { clearInterval(minuteurResultat); minuteurResultat = null; $('resCompte').textContent = ''; }
+
+  // ----- [VÊTEMENTS] Demande (panier) -----
+  function ouvrirVetements() {
+    vetSel = {}; vetPanier = [];
+    vetCle = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    $('vetErreur').textContent = '';
+    $('btnVetEnvoyer').disabled = false;
+    vetRendre();
+    aller('eVet');
+  }
+  function vetDef(article) { return VETEMENTS.find(v => v.article === article) || null; }
+  function vetTailles() {
+    const d = vetDef(vetSel.article);
+    if (!d || !d.modeles || !vetSel.modele) return [];
+    const m = d.modeles.find(x => x.nom === vetSel.modele);
+    return m ? m.tailles : [];
+  }
+  function vetLibelle(a) {
+    const d = vetDef(a.article);
+    if (!d || !d.modeles) return a.article;
+    if (!a.taille) return a.article + ' ' + a.modele;
+    if (a.article === 'Bottes') return 'Bottes ' + a.modele.toLowerCase() + ' ' + a.taille;
+    return a.modele + ' T' + a.taille;
+  }
+  function vetBoutons(cle, valeurs) {
+    return '<div class="choix">' + valeurs.map(v => `<button type="button" aria-pressed="${vetSel[cle] === v.val}" `
+      + `data-cle="${esc(cle)}" data-val="${esc(v.val)}" onclick="vetChoisir(this)">${esc(v.lib)}</button>`).join('') + '</div>';
+  }
+  function vetRendre() {
+    $('vetPanier').innerHTML = vetPanier.length
+      ? `<div class="panier"><div class="panier-titre">Ma demande (${vetPanier.length})</div>`
+        + vetPanier.map((a, i) => `<div class="panier-ligne"><span>${esc(vetLibelle(a))}</span>`
+          + `<button type="button" onclick="vetRetirer(${i})">Retirer</button></div>`).join('') + '</div>'
+      : '';
+    let h = `<div class="etape"><div class="etape-titre"><span class="etape-num">1</span>Quoi ?</div>`
+      + vetBoutons('article', VETEMENTS.map(v => ({ val: v.article, lib: (VET_ICONES[v.article] || '') + ' ' + v.article }))) + '</div>';
+    const d = vetDef(vetSel.article);
+    if (d && d.modeles) {
+      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">2</span>Modèle</div>`
+        + vetBoutons('modele', d.modeles.map(m => ({ val: m.nom, lib: m.nom }))) + '</div>';
+    }
+    const tailles = vetTailles();
+    if (tailles.length) {
+      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">3</span>${vetSel.article === 'Bottes' ? 'Pointure' : 'Taille'}</div>`
+        + vetBoutons('taille', tailles.map(t => ({ val: t, lib: t }))) + '</div>';
+    }
+    $('vetCorps').innerHTML = h;
+  }
+  function vetChoisir(btn) {
+    const cle = btn.dataset.cle, val = btn.dataset.val;
+    if (cle === 'article') vetSel = { article: val };
+    else if (cle === 'modele') { vetSel.modele = val; delete vetSel.taille; }
+    else vetSel.taille = val;
+    $('vetErreur').textContent = '';
+    const y = window.scrollY; vetRendre(); window.scrollTo(0, y);
+  }
+  // Article en cours de saisie → message d'erreur, ou '' s'il est complet
+  function vetManque() {
+    if (!vetSel.article) return 'Choisis un article.';
+    const d = vetDef(vetSel.article);
+    if (d && d.modeles && !vetSel.modele) return 'Choisis le modèle.';
+    if (vetTailles().length && !vetSel.taille) return vetSel.article === 'Bottes' ? 'Choisis la pointure.' : 'Choisis la taille.';
+    return '';
+  }
+  function vetPrendreSelection() {
+    const e = vetManque();
+    if (e) { $('vetErreur').textContent = e; return false; }
+    if (vetPanier.length >= VET_MAX) { $('vetErreur').textContent = VET_MAX + ' articles maximum par demande.'; return false; }
+    vetPanier.push({ article: vetSel.article, modele: vetSel.modele || '', taille: vetSel.taille || '' });
+    vetSel = {};
+    return true;
+  }
+  function vetAjouter() { if (vetPrendreSelection()) { vetRendre(); window.scrollTo(0, 0); } }
+  function vetRetirer(i) { vetPanier.splice(i, 1); vetRendre(); }
+  async function vetEnvoyer() {
+    // Article sélectionné mais pas encore ajouté : on le prend (s'il est complet)
+    if (vetSel.article && !vetPrendreSelection()) return;
+    if (!vetPanier.length) { $('vetErreur').textContent = 'Ajoute au moins un article.'; return; }
+    if (!navigator.onLine) { toast('Pas de réseau. Réessaie dans un instant.', true); return; }
+    $('btnVetEnvoyer').disabled = true;
+    chargement(true);
+    try {
+      const r = await appel('vetDemander', { code: codeOperateur, articles: vetPanier, cleEnvoi: vetCle });
+      if (!r.success) throw new Error(r.error || 'Envoi impossible.');
+      $('resRond').className = 'rond'; $('resRond').textContent = '✓';
+      $('resTitre').textContent = 'Demande envoyée';
+      $('resTexte').textContent = (r.articles || []).join(' · ') + ' — tu peux la suivre dans « Mes demandes ».';
+      $('resEncart').innerHTML = '';
+      $('resBoutons').innerHTML = `<button type="button" class="btn second large" onclick="ouvrirMesDemandes()">📦 Mes demandes</button>`
+        + `<button type="button" class="btn second large" onclick="nouvelleRemontee()">＋ Autre demande</button>`
+        + `<button type="button" class="btn principal large" onclick="deconnecter()">⏏ Me déconnecter</button>`;
+      vetPanier = [];
+      aller('eResultat');
+      lancerMinuteurResultat();
+    } catch (e) {
+      $('vetErreur').textContent = (e && e.message) || 'Envoi impossible. Réessaie.';
+      vetRendre();
+    } finally {
+      chargement(false);
+      $('btnVetEnvoyer').disabled = false;
+    }
+  }
+
+  // ----- [VÊTEMENTS] Mes demandes (privé) -----
+  async function ouvrirMesDemandes() {
+    $('mesDemCorps').innerHTML = '<div class="vide">Chargement…</div>';
+    aller('eMesDem');
+    try {
+      const r = await appel('vetMesDemandes', { code: codeOperateur });
+      if (!r.success) throw new Error(r.error);
+      const classe = { 'Demandée': 'recue', 'Prête': 'prete', 'Remise': 'traitee' };
+      $('mesDemCorps').innerHTML = (r.demandes || []).length
+        ? r.demandes.map(d => `<div class="demande"><div><b>${esc(d.articles.join(' · '))}</b>`
+            + `<small>Demandé le ${esc(d.quand)}${d.commentaire ? ' · 💬 ' + esc(d.commentaire) : ''}</small></div>`
+            + `<span class="tag ${classe[d.statut] || 'recue'}">${esc(d.statut)}</span></div>`).join('')
+        : '<div class="vide">Aucune demande ces 30 derniers jours.</div>';
+    } catch (e) {
+      $('mesDemCorps').innerHTML = '<div class="vide">' + esc((e && e.message) || 'Indisponible (réseau ?). Réessaie.') + '</div>';
+    }
+  }
 
   // ----- Suivi anonymisé -----
   let suiviLignes = [], suiviFiltre = 'tout';
