@@ -226,6 +226,7 @@
         <button type="button" class="tuile" onclick="ouvrirForm('toilettes')"><span class="ico">🚻</span>Toilettes<small>Hommes / Femmes</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('vestiaire')"><span class="ico">🔐</span>Vestiaire<small>Hommes / Femmes</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('divers')"><span class="ico">✏️</span>Autre<small>J'écris moi-même</small></button>
+        <button type="button" class="tuile" onclick="aller('eQhseMenu')"><span class="ico">⛑️</span>QHSE<small>Qualité, hygiène, sécurité, environnement</small></button>
         <button type="button" class="tuile" onclick="aller('eVetMenu')"><span class="ico">🧤</span>Vêtements et EPI<small>Bottes, gants, veste, cotte…</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirMesDemandes()"><span class="ico">📦</span>Mes demandes<small>Vêtements et EPI · visible par toi seul</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirSuivi()"><span class="ico">📋</span>Suivi des remontées<small>Statut et commentaires</small></button>
@@ -269,6 +270,39 @@
         <div class="barre-envoi" id="resBoutons"></div>
         <div class="compte" id="resCompte"></div>
       </div>
+    </section>
+
+    <!-- 9a. QHSE : 4 catégories, même formulaire -->
+    <section class="ecran" id="eQhseMenu">
+      <button type="button" class="retour" onclick="aller('eAccueil')">← Retour</button>
+      <h1>QHSE</h1>
+      <p class="sous">Signale une anomalie ou fais une recommandation. Le QHSE te répondra.</p>
+      <div class="tuiles">
+        <button type="button" class="tuile" onclick="ouvrirQhse('qualite')"><span class="ico">✅</span>Qualité</button>
+        <button type="button" class="tuile" onclick="ouvrirQhse('hygiene')"><span class="ico">🧼</span>Hygiène</button>
+        <button type="button" class="tuile" onclick="ouvrirQhse('securite')"><span class="ico">🦺</span>Sécurité</button>
+        <button type="button" class="tuile" onclick="ouvrirQhse('environnement')"><span class="ico">🌱</span>Environnement</button>
+        <button type="button" class="tuile secondaire" onclick="ouvrirMesQhse()"><span class="ico">📬</span>Mes remontées QHSE<small>Réponses du QHSE · visible par toi seul</small></button>
+      </div>
+    </section>
+
+    <!-- 9b. QHSE : formulaire -->
+    <section class="ecran" id="eQhseForm">
+      <button type="button" class="retour" onclick="aller('eQhseMenu')">← Retour</button>
+      <h1 id="qhseTitre">QHSE</h1>
+      <div id="qhseCorps"></div>
+      <div class="erreur" id="qhseErreur"></div>
+      <div class="barre-envoi">
+        <button type="button" class="btn principal" id="btnQhseEnvoyer" onclick="qhseEnvoyer()">✓ Envoyer au QHSE</button>
+      </div>
+    </section>
+
+    <!-- 9c. QHSE : mes remontées (privé) -->
+    <section class="ecran" id="eQhseMes">
+      <button type="button" class="retour" onclick="aller('eQhseMenu')">← Retour</button>
+      <h1>Mes remontées QHSE</h1>
+      <p class="sous">60 derniers jours · visible seulement avec ton code</p>
+      <div id="qhseMesCorps"><div class="vide">Chargement…</div></div>
     </section>
 
     <!-- 7a. VÊTEMENTS ET EPI : choix entre EPI (panier) et vêtements (réparation / changement) -->
@@ -397,6 +431,15 @@
   const REP_ICONES = { 'Veste': '🧥', 'Cotte': '👖', 'Réparation': '🪡', 'Changement': '🔄' };
   let repSel = {}, repCle = '';
 
+  // [QHSE] Remontées qualité / hygiène / sécurité / environnement (listes remplacées par celles du serveur, Qhse.gs)
+  const CLE_QHSE = 'borne_qhse';
+  let QHSE = lireStockage(CLE_QHSE) || {
+    categories: { qualite: 'Qualité', hygiene: 'Hygiène', securite: 'Sécurité', environnement: 'Environnement' },
+    prevenus: ['RAE', "Chef d'équipe", 'GV', 'Technique', 'QHSE', 'REX', 'Admin', 'Personne']
+  };
+  const QHSE_ICONES = { qualite: '✅', hygiene: '🧼', securite: '🦺', environnement: '🌱' };
+  let qhseSel = {}, qhseCle = '';
+
   let jeton = localStorage.getItem(CLE_JETON) || '';
   let codeOperateur = '', nomOperateur = '';
   let saisieCode = '';
@@ -449,6 +492,7 @@
       enregistrerListes(r.listes);
       enregistrerVetements(r.vetements);
       enregistrerReparation(r.vetReparation);
+      enregistrerQhse(r.qhse);
       $('installErreur').textContent = '';
       demarrerIdent();
     } catch (e) {
@@ -462,6 +506,9 @@
   }
   function enregistrerVetements(v) {
     if (Array.isArray(v) && v.length) { VETEMENTS = v; localStorage.setItem(CLE_VET, JSON.stringify(v)); }
+  }
+  function enregistrerQhse(v) {
+    if (v && v.categories && Array.isArray(v.prevenus) && v.prevenus.length) { QHSE = v; localStorage.setItem(CLE_QHSE, JSON.stringify(v)); }
   }
   function enregistrerReparation(v) {
     if (v && Array.isArray(v.vetements) && v.vetements.length) { VET_REP = v; localStorage.setItem(CLE_VET_REP, JSON.stringify(v)); }
@@ -508,7 +555,7 @@
       nomOperateur = r.nom || '';
       aller('eAccueil');
       // Rafraîchit les listes (engins, portes…) sans bloquer l'opérateur
-      appel('config').then(x => { if (x && x.success) { enregistrerListes(x.listes); enregistrerVetements(x.vetements); enregistrerReparation(x.vetReparation); } }).catch(() => {});
+      appel('config').then(x => { if (x && x.success) { enregistrerListes(x.listes); enregistrerVetements(x.vetements); enregistrerReparation(x.vetReparation); enregistrerQhse(x.qhse); } }).catch(() => {});
     } catch (e) {
       $('codeEtat').textContent = (e && e.message) || 'Pas de réseau. Réessaie.';
       $('codeEtat').style.color = 'var(--red)';
@@ -520,7 +567,7 @@
   function deconnecter() {
     codeOperateur = ''; nomOperateur = '';
     formType = null;
-    vetSel = {}; vetPanier = []; repSel = {};
+    vetSel = {}; vetPanier = []; repSel = {}; qhseSel = {};
     demarrerIdent();
   }
 
@@ -969,6 +1016,96 @@
     } finally {
       chargement(false);
       $('btnRepEnvoyer').disabled = false;
+    }
+  }
+
+  // ----- [QHSE] Formulaire (même trame pour les 4 catégories) -----
+  function qhseMaintenant() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function ouvrirQhse(cat) {
+    qhseSel = { categorie: cat, prevenus: [], dateHeure: qhseMaintenant() };
+    qhseCle = 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    $('qhseTitre').textContent = (QHSE_ICONES[cat] || '') + ' ' + (QHSE.categories[cat] || 'QHSE');
+    $('qhseErreur').textContent = '';
+    $('btnQhseEnvoyer').disabled = false;
+    qhseRendre();
+    aller('eQhseForm');
+  }
+  function qhseEtape(n, titre, html) {
+    return `<div class="etape"><div class="etape-titre"><span class="etape-num">${n}</span>${titre}</div>${html}</div>`;
+  }
+  function qhseRendre() {
+    const prev = '<div class="choix">' + QHSE.prevenus.map(p => `<button type="button" aria-pressed="${qhseSel.prevenus.indexOf(p) !== -1}" `
+      + `data-val="${esc(p)}" onclick="qhsePrevenu(this)">${esc(p)}</button>`).join('') + '</div>';
+    const urg = '<div class="choix">' + [['oui', '🔴 Oui'], ['non', 'Non']].map(u => `<button type="button" aria-pressed="${qhseSel.urgent === u[0]}" `
+      + `onclick="qhseUrgent('${u[0]}')">${u[1]}</button>`).join('') + '</div>';
+    $('qhseCorps').innerHTML =
+        qhseEtape(1, 'Date et heure du constat', `<input type="datetime-local" class="texte" max="${qhseMaintenant()}" value="${esc(qhseSel.dateHeure)}" oninput="qhseSel.dateHeure=this.value">`)
+      + qhseEtape(2, 'Qui as-tu prévenu ? <span style="font-weight:600;color:var(--muted);font-size:16px">(plusieurs possibles)</span>', prev)
+      + qhseEtape(3, 'Urgent ?', urg)
+      + qhseEtape(4, "Description de l'anomalie / de la recommandation",
+          `<textarea maxlength="1000" placeholder="Que s'est-il passé ? Où ? Que proposes-tu ?" oninput="qhseSel.description=this.value">${esc(qhseSel.description || '')}</textarea>`);
+  }
+  function qhsePrevenu(btn) {
+    const p = btn.dataset.val, i = qhseSel.prevenus.indexOf(p);
+    if (i !== -1) qhseSel.prevenus.splice(i, 1);
+    else if (p === 'Personne') qhseSel.prevenus = ['Personne'];           // « Personne » exclut les autres choix
+    else { qhseSel.prevenus = qhseSel.prevenus.filter(x => x !== 'Personne'); qhseSel.prevenus.push(p); }
+    $('qhseErreur').textContent = '';
+    const y = window.scrollY; qhseRendre(); window.scrollTo(0, y);
+  }
+  function qhseUrgent(v) {
+    qhseSel.urgent = v;
+    $('qhseErreur').textContent = '';
+    const y = window.scrollY; qhseRendre(); window.scrollTo(0, y);
+  }
+  async function qhseEnvoyer() {
+    const manque = !qhseSel.dateHeure ? 'Indique la date et l\'heure.' : !qhseSel.prevenus.length ? 'Indique qui tu as prévenu (ou « Personne »).'
+      : !qhseSel.urgent ? 'Indique si c\'est urgent.' : String(qhseSel.description || '').trim().length < 3 ? 'Décris l\'anomalie ou la recommandation.' : '';
+    if (manque) { $('qhseErreur').textContent = manque; return; }
+    if (!navigator.onLine) { toast('Pas de réseau. Réessaie dans un instant.', true); return; }
+    $('btnQhseEnvoyer').disabled = true;
+    chargement(true);
+    try {
+      const r = await appel('qhseEnvoyer', { code: codeOperateur, cleEnvoi: qhseCle, qhse: {
+        categorie: qhseSel.categorie, dateHeure: qhseSel.dateHeure, prevenus: qhseSel.prevenus,
+        urgent: qhseSel.urgent === 'oui', description: String(qhseSel.description || '').trim() } });
+      if (!r.success) throw new Error(r.error || 'Envoi impossible.');
+      $('resRond').className = 'rond'; $('resRond').textContent = '✓';
+      $('resTitre').textContent = 'Remontée envoyée au QHSE';
+      $('resTexte').textContent = (r.categorie || '') + ' — tu verras sa réponse dans « Mes remontées QHSE ».';
+      $('resEncart').innerHTML = '';
+      $('resBoutons').innerHTML = `<button type="button" class="btn second large" onclick="ouvrirMesQhse()">📬 Mes remontées QHSE</button>`
+        + `<button type="button" class="btn second large" onclick="nouvelleRemontee()">＋ Autre remontée</button>`
+        + `<button type="button" class="btn principal large" onclick="deconnecter()">⏏ Me déconnecter</button>`;
+      qhseSel = {};
+      aller('eResultat');
+      lancerMinuteurResultat();
+    } catch (e) {
+      $('qhseErreur').textContent = (e && e.message) || 'Envoi impossible. Réessaie.';
+    } finally {
+      chargement(false);
+      $('btnQhseEnvoyer').disabled = false;
+    }
+  }
+
+  // ----- [QHSE] Mes remontées (privé, avec la réponse du QHSE) -----
+  async function ouvrirMesQhse() {
+    $('qhseMesCorps').innerHTML = '<div class="vide">Chargement…</div>';
+    aller('eQhseMes');
+    try {
+      const r = await appel('qhseMesRemontees', { code: codeOperateur });
+      if (!r.success) throw new Error(r.error);
+      $('qhseMesCorps').innerHTML = (r.remontees || []).length
+        ? r.remontees.map(x => `<div class="demande"><div><b>${esc(x.categorie)}${x.urgent ? ' · 🔴 urgent' : ''}</b>`
+            + `<small>Constaté le ${esc(x.quand)}</small><small>${esc(x.description)}</small>`
+            + (x.reponse ? `<small style="color:var(--green);font-weight:700">💬 QHSE (${esc(x.reponduLe)}) : ${esc(x.reponse)}</small>` : '')
+            + `</div><span class="tag ${x.reponse ? 'traitee' : 'recue'}">${x.reponse ? 'Répondu' : 'Reçue'}</span></div>`).join('')
+        : '<div class="vide">Aucune remontée QHSE ces 60 derniers jours.</div>';
+    } catch (e) {
+      $('qhseMesCorps').innerHTML = '<div class="vide">' + esc((e && e.message) || 'Indisponible (réseau ?). Réessaie.') + '</div>';
     }
   }
 
