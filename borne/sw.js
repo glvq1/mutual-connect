@@ -1,6 +1,6 @@
 // Service worker de la borne : garde la page en cache (démarrage même si le wifi est lent).
 // Les envois vers Apps Script (script.google.com) passent toujours en direct.
-const CACHE = 'mutual-borne-v7';
+const CACHE = 'mutual-borne-v8';
 const SHELL = ['./', 'index.html', 'manifest.json', '../icon-192.png', '../icon-512.png', '../assets/logo-mutual.png'];
 
 self.addEventListener('install', e => {

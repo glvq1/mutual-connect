@@ -379,8 +379,7 @@
     { article: 'Bottes', modeles: [{ nom: 'Cuir', tailles: POINTURES }, { nom: 'Tissu', tailles: POINTURES }] },
     { article: 'Gants', modeles: [
       { nom: 'Gants jaunes', tailles: ['7', '8', '9', '10', '11'] }, { nom: 'Moufles', tailles: ['M', 'L', 'XL'] },
-      { nom: 'Gants rouges', tailles: ['M', 'L', 'XL'] }, { nom: 'Ninja noir', tailles: ['8', '9', '10'] },
-      { nom: 'Tegera blanc/vert', tailles: ['8', '9', '10'] }] },
+      { nom: 'Gants rouges', tailles: ['M', 'L', 'XL'] }, { nom: 'Ninja noir', tailles: ['8', '9', '10'] }] },
     { article: 'Sous-gants', modeles: [{ nom: 'Décathlon', tailles: [] }, { nom: 'Laine', tailles: [] }] },
     { article: 'Bonnet', modeles: null }
   ];
@@ -392,7 +391,7 @@
   const CLE_VET_REP = 'borne_vet_reparation';
   let VET_REP = lireStockage(CLE_VET_REP) || {
     vetements: ['Veste', 'Cotte'], actions: ['Réparation', 'Changement'],
-    tailles: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
+    tailles: ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'],
     motifs: ['Déchirure', 'Fermeture cassée', 'Usure', 'Mauvaise taille', 'Autre']
   };
   const REP_ICONES = { 'Veste': '🧥', 'Cotte': '👖', 'Réparation': '🪡', 'Changement': '🔄' };
@@ -824,12 +823,14 @@
     const m = d.modeles.find(x => x.nom === vetSel.modele);
     return m ? m.tailles : [];
   }
+  // Même libellé que le serveur (Vetements.gs → vetLibelle_) ; le catalogue est modifiable dans Mutual Connect
   function vetLibelle(a) {
     const d = vetDef(a.article);
     if (!d || !d.modeles) return a.article;
     if (!a.taille) return a.article + ' ' + a.modele;
-    if (a.article === 'Bottes') return 'Bottes ' + a.modele.toLowerCase() + ' ' + a.taille;
-    return a.modele + ' T' + a.taille;
+    if (/^\d+$/.test(a.taille) && +a.taille >= 30) return a.article + ' ' + a.modele.toLowerCase() + ' ' + a.taille;
+    if (a.article === 'Gants') return a.modele + ' T' + a.taille;
+    return a.article + ' ' + a.modele + ' T' + a.taille;
   }
   function vetBoutons(cle, valeurs) {
     return '<div class="choix">' + valeurs.map(v => `<button type="button" aria-pressed="${vetSel[cle] === v.val}" `
@@ -850,7 +851,7 @@
     }
     const tailles = vetTailles();
     if (tailles.length) {
-      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">3</span>${vetSel.article === 'Bottes' ? 'Pointure' : 'Taille'}</div>`
+      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">3</span>${tailles.every(t => /^\d+$/.test(t) && +t >= 30) ? 'Pointure' : 'Taille'}</div>`
         + vetBoutons('taille', tailles.map(t => ({ val: t, lib: t }))) + '</div>';
     }
     $('vetCorps').innerHTML = h;
@@ -868,7 +869,7 @@
     if (!vetSel.article) return 'Choisis un article.';
     const d = vetDef(vetSel.article);
     if (d && d.modeles && !vetSel.modele) return 'Choisis le modèle.';
-    if (vetTailles().length && !vetSel.taille) return vetSel.article === 'Bottes' ? 'Choisis la pointure.' : 'Choisis la taille.';
+    if (vetTailles().length && !vetSel.taille) return vetTailles().every(t => /^\d+$/.test(t) && +t >= 30) ? 'Choisis la pointure.' : 'Choisis la taille.';
     return '';
   }
   function vetPrendreSelection() {
