@@ -226,7 +226,7 @@
         <button type="button" class="tuile" onclick="ouvrirForm('toilettes')"><span class="ico">🚻</span>Toilettes<small>Hommes / Femmes</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('vestiaire')"><span class="ico">🔐</span>Vestiaire<small>Hommes / Femmes</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('divers')"><span class="ico">✏️</span>Autre<small>J'écris moi-même</small></button>
-        <button type="button" class="tuile" onclick="aller('eQhseMenu')"><span class="ico">🛡️</span>QHSE<small>Qualité, hygiène, sécurité, environnement</small></button>
+        <button type="button" class="tuile" onclick="aller('eQhseMenu')"><span class="ico">⛑️</span>QHSE<small>Qualité, hygiène, sécurité, environnement</small></button>
         <button type="button" class="tuile" onclick="aller('eVetMenu')"><span class="ico">🧤</span>Vêtements et EPI<small>Bottes, gants, veste, cotte…</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirMesDemandes()"><span class="ico">📦</span>Mes demandes<small>Vêtements et EPI · visible par toi seul</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirSuivi()"><span class="ico">📋</span>Suivi des remontées<small>Statut et commentaires</small></button>
@@ -280,7 +280,7 @@
       <div class="tuiles">
         <button type="button" class="tuile" onclick="ouvrirQhse('qualite')"><span class="ico">✅</span>Qualité</button>
         <button type="button" class="tuile" onclick="ouvrirQhse('hygiene')"><span class="ico">🧼</span>Hygiène</button>
-        <button type="button" class="tuile" onclick="ouvrirQhse('securite')"><span class="ico">⛑️</span>Sécurité</button>
+        <button type="button" class="tuile" onclick="ouvrirQhse('securite')"><span class="ico">🦺</span>Sécurité</button>
         <button type="button" class="tuile" onclick="ouvrirQhse('environnement')"><span class="ico">🌱</span>Environnement</button>
         <button type="button" class="tuile secondaire" onclick="ouvrirMesQhse()"><span class="ico">📬</span>Mes remontées QHSE<small>Réponses du QHSE · visible par toi seul</small></button>
       </div>
@@ -437,7 +437,7 @@
     categories: { qualite: 'Qualité', hygiene: 'Hygiène', securite: 'Sécurité', environnement: 'Environnement' },
     prevenus: ['RAE', "Chef d'équipe", 'GV', 'Technique', 'QHSE', 'REX', 'Admin', 'Personne']
   };
-  const QHSE_ICONES = { qualite: '✅', hygiene: '🧼', securite: '⛑️', environnement: '🌱' };
+  const QHSE_ICONES = { qualite: '✅', hygiene: '🧼', securite: '🦺', environnement: '🌱' };
   let qhseSel = {}, qhseCle = '';
 
   let jeton = localStorage.getItem(CLE_JETON) || '';
