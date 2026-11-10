@@ -226,8 +226,8 @@
         <button type="button" class="tuile" onclick="ouvrirForm('toilettes')"><span class="ico">🚻</span>Toilettes<small>Hommes / Femmes</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('vestiaire')"><span class="ico">🔐</span>Vestiaire<small>Hommes / Femmes</small></button>
         <button type="button" class="tuile" onclick="ouvrirForm('divers')"><span class="ico">✏️</span>Autre<small>J'écris moi-même</small></button>
-        <button type="button" class="tuile" onclick="ouvrirVetements()"><span class="ico">🧤</span>Vêtements<small>Bottes, gants, bonnet…</small></button>
-        <button type="button" class="tuile secondaire" onclick="ouvrirMesDemandes()"><span class="ico">📦</span>Mes demandes<small>Vêtements · visible par toi seul</small></button>
+        <button type="button" class="tuile" onclick="aller('eVetMenu')"><span class="ico">🧤</span>Vêtements et EPI<small>Bottes, gants, veste, cotte…</small></button>
+        <button type="button" class="tuile secondaire" onclick="ouvrirMesDemandes()"><span class="ico">📦</span>Mes demandes<small>Vêtements et EPI · visible par toi seul</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirSuivi()"><span class="ico">📋</span>Suivi des remontées<small>Statut et commentaires</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirColis()"><span class="ico">🥚</span>Colis fragiles<small>Produits fragiles · consultation</small></button>
       </div>
@@ -271,10 +271,33 @@
       </div>
     </section>
 
-    <!-- 7. DEMANDE DE VÊTEMENTS (panier de 1 à 6 articles) -->
-    <section class="ecran" id="eVet">
+    <!-- 7a. VÊTEMENTS ET EPI : choix entre EPI (panier) et vêtements (réparation / changement) -->
+    <section class="ecran" id="eVetMenu">
       <button type="button" class="retour" onclick="aller('eAccueil')">← Retour</button>
-      <h1>🧤 Demande de vêtements</h1>
+      <h1>Vêtements et EPI</h1>
+      <p class="sous">Que veux-tu demander ?</p>
+      <div class="tuiles">
+        <button type="button" class="tuile" onclick="ouvrirVetements()"><span class="ico">🥾</span>EPI<small>Bottes, gants, sous-gants, bonnet</small></button>
+        <button type="button" class="tuile" onclick="ouvrirReparation()"><span class="ico">🧥</span>Vêtements<small>Réparation ou changement · veste, cotte</small></button>
+      </div>
+    </section>
+
+    <!-- 7b. VÊTEMENTS : réparation ou changement de veste / cotte -->
+    <section class="ecran" id="eVetRep">
+      <button type="button" class="retour" onclick="aller('eVetMenu')">← Retour</button>
+      <h1>🧥 Réparation ou changement</h1>
+      <p class="sous">Veste ou cotte : choisis puis envoie la demande.</p>
+      <div id="repCorps"></div>
+      <div class="erreur" id="repErreur"></div>
+      <div class="barre-envoi">
+        <button type="button" class="btn principal" id="btnRepEnvoyer" onclick="repEnvoyer()">✓ Envoyer la demande</button>
+      </div>
+    </section>
+
+    <!-- 7. DEMANDE D'EPI (panier de 1 à 6 articles) -->
+    <section class="ecran" id="eVet">
+      <button type="button" class="retour" onclick="aller('eVetMenu')">← Retour</button>
+      <h1>🥾 Demande d'EPI</h1>
       <p class="sous">Ajoute un ou plusieurs articles, puis envoie la demande.</p>
       <div id="vetPanier"></div>
       <div id="vetCorps"></div>
@@ -288,7 +311,7 @@
     <!-- 8. MES DEMANDES (privé : seulement celles du code connecté) -->
     <section class="ecran" id="eMesDem">
       <button type="button" class="retour" onclick="aller('eAccueil')">← Retour</button>
-      <h1>Mes demandes de vêtements</h1>
+      <h1>Mes demandes de vêtements et EPI</h1>
       <p class="sous">30 derniers jours · visible seulement avec ton code</p>
       <div id="mesDemCorps"><div class="vide">Chargement…</div></div>
     </section>
@@ -356,14 +379,23 @@
     { article: 'Bottes', modeles: [{ nom: 'Cuir', tailles: POINTURES }, { nom: 'Tissu', tailles: POINTURES }] },
     { article: 'Gants', modeles: [
       { nom: 'Gants jaunes', tailles: ['7', '8', '9', '10', '11'] }, { nom: 'Moufles', tailles: ['M', 'L', 'XL'] },
-      { nom: 'Gants rouges', tailles: ['M', 'L', 'XL'] }, { nom: 'Ninja noir', tailles: ['8', '9', '10'] },
-      { nom: 'Tegera blanc/vert', tailles: ['8', '9', '10'] }] },
+      { nom: 'Gants rouges', tailles: ['M', 'L', 'XL'] }, { nom: 'Ninja noir', tailles: ['8', '9', '10'] }] },
     { article: 'Sous-gants', modeles: [{ nom: 'Décathlon', tailles: [] }, { nom: 'Laine', tailles: [] }] },
     { article: 'Bonnet', modeles: null }
   ];
   const VET_ICONES = { 'Bottes': '🥾', 'Gants': '🧤', 'Sous-gants': '🧶', 'Bonnet': '🧢' };
   const VET_MAX = 6;
   let vetSel = {}, vetPanier = [], vetCle = '';
+
+  // [VÊTEMENTS] Réparation / changement de veste ou cotte (listes remplacées par celles du serveur, Vetements.gs)
+  const CLE_VET_REP = 'borne_vet_reparation';
+  let VET_REP = lireStockage(CLE_VET_REP) || {
+    vetements: ['Veste', 'Cotte'], actions: ['Réparation', 'Changement'],
+    tailles: ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'],
+    motifs: ['Déchirure', 'Fermeture cassée', 'Usure', 'Mauvaise taille', 'Autre']
+  };
+  const REP_ICONES = { 'Veste': '🧥', 'Cotte': '👖', 'Réparation': '🪡', 'Changement': '🔄' };
+  let repSel = {}, repCle = '';
 
   let jeton = localStorage.getItem(CLE_JETON) || '';
   let codeOperateur = '', nomOperateur = '';
@@ -416,6 +448,7 @@
       localStorage.setItem(CLE_JETON, jeton);
       enregistrerListes(r.listes);
       enregistrerVetements(r.vetements);
+      enregistrerReparation(r.vetReparation);
       $('installErreur').textContent = '';
       demarrerIdent();
     } catch (e) {
@@ -429,6 +462,9 @@
   }
   function enregistrerVetements(v) {
     if (Array.isArray(v) && v.length) { VETEMENTS = v; localStorage.setItem(CLE_VET, JSON.stringify(v)); }
+  }
+  function enregistrerReparation(v) {
+    if (v && Array.isArray(v.vetements) && v.vetements.length) { VET_REP = v; localStorage.setItem(CLE_VET_REP, JSON.stringify(v)); }
   }
 
   // ----- Identification : code opérateur vérifié par le serveur, puis nom affiché -----
@@ -472,7 +508,7 @@
       nomOperateur = r.nom || '';
       aller('eAccueil');
       // Rafraîchit les listes (engins, portes…) sans bloquer l'opérateur
-      appel('config').then(x => { if (x && x.success) { enregistrerListes(x.listes); enregistrerVetements(x.vetements); } }).catch(() => {});
+      appel('config').then(x => { if (x && x.success) { enregistrerListes(x.listes); enregistrerVetements(x.vetements); enregistrerReparation(x.vetReparation); } }).catch(() => {});
     } catch (e) {
       $('codeEtat').textContent = (e && e.message) || 'Pas de réseau. Réessaie.';
       $('codeEtat').style.color = 'var(--red)';
@@ -484,7 +520,7 @@
   function deconnecter() {
     codeOperateur = ''; nomOperateur = '';
     formType = null;
-    vetSel = {}; vetPanier = [];
+    vetSel = {}; vetPanier = []; repSel = {};
     demarrerIdent();
   }
 
@@ -787,12 +823,14 @@
     const m = d.modeles.find(x => x.nom === vetSel.modele);
     return m ? m.tailles : [];
   }
+  // Même libellé que le serveur (Vetements.gs → vetLibelle_) ; le catalogue est modifiable dans Mutual Connect
   function vetLibelle(a) {
     const d = vetDef(a.article);
     if (!d || !d.modeles) return a.article;
     if (!a.taille) return a.article + ' ' + a.modele;
-    if (a.article === 'Bottes') return 'Bottes ' + a.modele.toLowerCase() + ' ' + a.taille;
-    return a.modele + ' T' + a.taille;
+    if (/^\d+$/.test(a.taille) && +a.taille >= 30) return a.article + ' ' + a.modele.toLowerCase() + ' ' + a.taille;
+    if (a.article === 'Gants') return a.modele + ' T' + a.taille;
+    return a.article + ' ' + a.modele + ' T' + a.taille;
   }
   function vetBoutons(cle, valeurs) {
     return '<div class="choix">' + valeurs.map(v => `<button type="button" aria-pressed="${vetSel[cle] === v.val}" `
@@ -813,7 +851,7 @@
     }
     const tailles = vetTailles();
     if (tailles.length) {
-      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">3</span>${vetSel.article === 'Bottes' ? 'Pointure' : 'Taille'}</div>`
+      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">3</span>${tailles.every(t => /^\d+$/.test(t) && +t >= 30) ? 'Pointure' : 'Taille'}</div>`
         + vetBoutons('taille', tailles.map(t => ({ val: t, lib: t }))) + '</div>';
     }
     $('vetCorps').innerHTML = h;
@@ -831,7 +869,7 @@
     if (!vetSel.article) return 'Choisis un article.';
     const d = vetDef(vetSel.article);
     if (d && d.modeles && !vetSel.modele) return 'Choisis le modèle.';
-    if (vetTailles().length && !vetSel.taille) return vetSel.article === 'Bottes' ? 'Choisis la pointure.' : 'Choisis la taille.';
+    if (vetTailles().length && !vetSel.taille) return vetTailles().every(t => /^\d+$/.test(t) && +t >= 30) ? 'Choisis la pointure.' : 'Choisis la taille.';
     return '';
   }
   function vetPrendreSelection() {
@@ -870,6 +908,67 @@
     } finally {
       chargement(false);
       $('btnVetEnvoyer').disabled = false;
+    }
+  }
+
+  // ----- [VÊTEMENTS] Réparation / changement de veste ou cotte -----
+  function ouvrirReparation() {
+    repSel = {};
+    repCle = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    $('repErreur').textContent = '';
+    $('btnRepEnvoyer').disabled = false;
+    repRendre();
+    aller('eVetRep');
+  }
+  function repBoutons(cle, valeurs) {
+    return '<div class="choix">' + valeurs.map(v => `<button type="button" aria-pressed="${repSel[cle] === v}" `
+      + `data-cle="${esc(cle)}" data-val="${esc(v)}" onclick="repChoisir(this)">${esc((REP_ICONES[v] ? REP_ICONES[v] + ' ' : '') + v)}</button>`).join('') + '</div>';
+  }
+  function repEtape(n, titre, html) {
+    return `<div class="etape"><div class="etape-titre"><span class="etape-num">${n}</span>${titre}</div>${html}</div>`;
+  }
+  function repRendre() {
+    $('repCorps').innerHTML =
+        repEtape(1, 'Quel vêtement ?', repBoutons('vetement', VET_REP.vetements))
+      + repEtape(2, 'Que faut-il faire ?', repBoutons('action', VET_REP.actions))
+      + repEtape(3, 'Taille', repBoutons('taille', VET_REP.tailles))
+      + repEtape(4, 'Motif', repBoutons('motif', VET_REP.motifs))
+      + repEtape(5, 'Commentaire <span style="font-weight:600;color:var(--muted);font-size:16px">(facultatif' + (repSel.motif === 'Autre' ? ' sauf motif « Autre »' : '') + ')</span>',
+          `<textarea id="repCommentaire" maxlength="150" placeholder="ex. manche gauche décousue" oninput="repSel.commentaire=this.value">${esc(repSel.commentaire || '')}</textarea>`);
+  }
+  function repChoisir(btn) {
+    repSel[btn.dataset.cle] = btn.dataset.val;
+    $('repErreur').textContent = '';
+    const y = window.scrollY; repRendre(); window.scrollTo(0, y);
+  }
+  async function repEnvoyer() {
+    const manque = !repSel.vetement ? 'Choisis le vêtement.' : !repSel.action ? 'Choisis réparation ou changement.'
+      : !repSel.taille ? 'Choisis la taille.' : !repSel.motif ? 'Choisis le motif.'
+      : (repSel.motif === 'Autre' && !String(repSel.commentaire || '').trim()) ? 'Motif « Autre » : précise dans le commentaire.' : '';
+    if (manque) { $('repErreur').textContent = manque; return; }
+    if (!navigator.onLine) { toast('Pas de réseau. Réessaie dans un instant.', true); return; }
+    $('btnRepEnvoyer').disabled = true;
+    chargement(true);
+    try {
+      const r = await appel('vetReparer', { code: codeOperateur, cleEnvoi: repCle, reparation: {
+        vetement: repSel.vetement, action: repSel.action, taille: repSel.taille, motif: repSel.motif,
+        commentaire: String(repSel.commentaire || '').trim() } });
+      if (!r.success) throw new Error(r.error || 'Envoi impossible.');
+      $('resRond').className = 'rond'; $('resRond').textContent = '✓';
+      $('resTitre').textContent = 'Demande envoyée';
+      $('resTexte').textContent = (r.articles || []).join(' · ') + ' — tu peux la suivre dans « Mes demandes ».';
+      $('resEncart').innerHTML = '';
+      $('resBoutons').innerHTML = `<button type="button" class="btn second large" onclick="ouvrirMesDemandes()">📦 Mes demandes</button>`
+        + `<button type="button" class="btn second large" onclick="nouvelleRemontee()">＋ Autre demande</button>`
+        + `<button type="button" class="btn principal large" onclick="deconnecter()">⏏ Me déconnecter</button>`;
+      repSel = {};
+      aller('eResultat');
+      lancerMinuteurResultat();
+    } catch (e) {
+      $('repErreur').textContent = (e && e.message) || 'Envoi impossible. Réessaie.';
+    } finally {
+      chargement(false);
+      $('btnRepEnvoyer').disabled = false;
     }
   }
 
