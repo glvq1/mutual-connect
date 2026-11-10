@@ -138,6 +138,19 @@
     .demande small { display: block; color: var(--muted); font-size: 15px; margin-top: 4px; }
     .tag.prete { background: var(--amber-bg); color: var(--amber); }
 
+    /* [COLIS FRAGILES] consultation seule */
+    .cf-ro { display: inline-block; background: var(--soft); color: var(--secondary); font-weight: 800; font-size: 15px; padding: 8px 14px; border-radius: 12px; margin-bottom: 14px; }
+    .cf-cartes { display: grid; gap: 12px; }
+    .cf-carte { background: #fff; border: 2px solid var(--line); border-left: 10px solid var(--primary); border-radius: 16px; padding: 14px 18px; }
+    .cf-tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+    .cf-ifls { font-family: ui-monospace, Menlo, monospace; font-size: 24px; font-weight: 800; color: var(--secondary); letter-spacing: 1px; }
+    .cf-lib { font-size: 20px; font-weight: 800; }
+    .cf-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .cf-tag { background: var(--bg); border: 2px solid var(--line); border-radius: 10px; padding: 6px 12px; font-size: 17px; font-weight: 700; }
+    .cf-tag.motif { color: #fff; border: 0; }
+    .cf-cons { margin-top: 10px; font-size: 18px; color: var(--text); }
+    .cf-pastille { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+
     /* Divers */
     .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: #3a3a3a; color: #fff; padding: 16px 22px; border-radius: 14px;
       font-weight: 700; z-index: 20; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
@@ -192,6 +205,9 @@
           <div class="barre-envoi" style="margin-top:18px;">
             <button type="button" class="btn second large" onclick="ouvrirSuivi()">📋 Voir le suivi des remontées</button>
           </div>
+          <div class="barre-envoi" style="margin-top:10px;">
+            <button type="button" class="btn second large" onclick="ouvrirColis()">🥚 Colis fragiles</button>
+          </div>
         </div>
         <div class="ident-carte">
           <div class="clavier" id="clavier"></div>
@@ -213,6 +229,7 @@
         <button type="button" class="tuile" onclick="ouvrirVetements()"><span class="ico">🧤</span>Vêtements<small>Bottes, gants, bonnet…</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirMesDemandes()"><span class="ico">📦</span>Mes demandes<small>Vêtements · visible par toi seul</small></button>
         <button type="button" class="tuile secondaire" onclick="ouvrirSuivi()"><span class="ico">📋</span>Suivi des remontées<small>Statut et commentaires</small></button>
+        <button type="button" class="tuile secondaire" onclick="ouvrirColis()"><span class="ico">🥚</span>Colis fragiles<small>Produits fragiles · consultation</small></button>
       </div>
     </section>
 
@@ -290,6 +307,17 @@
         <thead><tr><th style="width:14%">Date</th><th>Objet</th><th style="width:9%">Nb</th><th style="width:14%">Statut</th><th style="width:30%">Commentaire</th></tr></thead>
         <tbody id="suiviCorps"><tr><td colspan="5" class="vide">Chargement…</td></tr></tbody>
       </table>
+    </section>
+    <!-- 9. [COLIS FRAGILES] RÉPERTOIRE (lecture seule, modifié dans Mutual Connect) -->
+    <section class="ecran" id="eColis">
+      <button type="button" class="retour" id="colisRetour">← Retour</button>
+      <h1>🥚 Colis fragiles</h1>
+      <p class="sous" id="colisSous">Produits fragiles et consignes de manipulation</p>
+      <span class="cf-ro">👁️ Consultation seule</span>
+      <input class="texte" id="colisRecherche" type="search" autocomplete="off" placeholder="🔍 IFLS, allée, emplacement, libellé…" oninput="rendreColis()">
+      <div class="filtres" id="colisFiltres" style="margin-top:12px;"></div>
+      <p class="sous" id="colisCompte" style="margin:0 0 12px;"></p>
+      <div class="cf-cartes" id="colisCorps"><div class="vide">Chargement…</div></div>
     </section>
   </main>
 
@@ -895,6 +923,52 @@
         <td>${l.nb > 1 ? `<span class="tag nb">×${l.nb}</span>` : '×1'}</td>
         <td><span class="tag ${classe[l.statut] || 'recue'}">${esc(l.statut)}</span></td>
         <td>${l.commentaire ? esc(l.commentaire) : '<span style="color:#b5aa94">—</span>'}</td></tr>`).join('');
+  }
+
+  // ----- [COLIS FRAGILES] Répertoire en lecture seule (action 'colisFragiles', ColisFragiles.gs) -----
+  const CLE_COLIS = 'borne_colis_fragiles';
+  const COLIS_COULEURS = { 'Écrasable': '#e67e22', 'Cassable (biscuit, cône…)': '#9b59b6', 'Sens obligatoire': '#1e6b4f' };
+  let colisLignes = [], colisMotifs = Object.keys(COLIS_COULEURS), colisFiltre = 'Tous';
+  async function ouvrirColis() {
+    const retour = codeOperateur ? 'eAccueil' : 'eIdent';
+    $('colisRetour').onclick = () => aller(retour);
+    $('colisRecherche').value = '';
+    colisFiltre = 'Tous';
+    $('colisCorps').innerHTML = '<div class="vide">Chargement…</div>';
+    aller('eColis');
+    try {
+      const r = await appel('colisFragiles');
+      if (!r.success) throw new Error(r.error);
+      colisLignes = r.lignes || [];
+      if (Array.isArray(r.motifs) && r.motifs.length) colisMotifs = r.motifs;
+      $('colisSous').textContent = 'Produits fragiles et consignes' + (r.maj ? ' · mis à jour le ' + r.maj : '');
+      try { localStorage.setItem(CLE_COLIS, JSON.stringify({ lignes: colisLignes, motifs: colisMotifs, maj: r.maj || '' })); } catch (e) {}
+    } catch (e) {
+      // Pas de réseau : dernière liste reçue sur cette tablette
+      const memo = lireStockage(CLE_COLIS);
+      if (!memo) { $('colisCorps').innerHTML = '<div class="vide">Répertoire indisponible (réseau ?). Réessaie.</div>'; $('colisFiltres').innerHTML = ''; $('colisCompte').textContent = ''; return; }
+      colisLignes = memo.lignes || [];
+      colisMotifs = memo.motifs || colisMotifs;
+      $('colisSous').textContent = 'Hors ligne · dernière liste reçue' + (memo.maj ? ' (' + memo.maj + ')' : '');
+    }
+    rendreColis();
+  }
+  function rendreColis() {
+    relancerInactivite();
+    $('colisFiltres').innerHTML = ['Tous'].concat(colisMotifs).map(m =>
+      `<button type="button" aria-pressed="${m === colisFiltre}" data-m="${esc(m)}">${m === 'Tous' ? 'Tous' : `<span class="cf-pastille" style="background:${COLIS_COULEURS[m] || '#ccc'}"></span>${esc(m)}`}</button>`).join('');
+    $('colisFiltres').querySelectorAll('button').forEach(b => b.onclick = () => { colisFiltre = b.dataset.m; rendreColis(); });
+    const q = $('colisRecherche').value.trim().toLowerCase();
+    const res = colisLignes.filter(l => (!q || [l.ifls, l.allee, l.emplacement, l.libelle, l.motif, l.consigne].join(' ').toLowerCase().indexOf(q) !== -1)
+      && (colisFiltre === 'Tous' || l.motif === colisFiltre));
+    $('colisCompte').textContent = res.length + ' produit(s) sur ' + colisLignes.length;
+    $('colisCorps').innerHTML = res.length ? res.map(l => {
+      const coul = COLIS_COULEURS[l.motif] || 'var(--primary)';
+      return `<div class="cf-carte" style="border-left-color:${coul}">
+        <div class="cf-tete"><span class="cf-ifls">${esc(l.ifls)}</span><span class="cf-lib">${esc(l.libelle)}</span></div>
+        <div class="cf-tags"><span class="cf-tag">Allée ${esc(l.allee || '–')}</span><span class="cf-tag">Empl. ${esc(l.emplacement || '–')}</span>${l.motif ? `<span class="cf-tag motif" style="background:${coul}">${esc(l.motif)}</span>` : ''}</div>
+        ${l.consigne ? `<div class="cf-cons">⚠️ ${esc(l.consigne)}</div>` : ''}</div>`;
+    }).join('') : '<div class="vide">Aucun produit trouvé.</div>';
   }
 
   // ----- Réseau, démarrage -----
