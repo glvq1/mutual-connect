@@ -419,7 +419,8 @@
   ];
   const VET_ICONES = { 'Bottes': '🥾', 'Gants': '🧤', 'Sous-gants': '🧶', 'Bonnet': '🧢' };
   const VET_MAX = 6;
-  let vetSel = {}, vetPanier = [], vetCle = '';
+  let vetSel = {}, vetPanier = [], vetCle = '', vetEquipe = '';
+  const VET_EQUIPES = [['Matin', '🌅 Matin'], ['Après-midi', '☀️ Après-midi'], ['Nuit', '🌙 Nuit']]; // [EPI] choisit le chef d'équipe destinataire du mail
 
   // [VÊTEMENTS] Réparation / changement de veste ou cotte (listes remplacées par celles du serveur, Vetements.gs)
   const CLE_VET_REP = 'borne_vet_reparation';
@@ -856,7 +857,7 @@
 
   // ----- [VÊTEMENTS] Demande (panier) -----
   function ouvrirVetements() {
-    vetSel = {}; vetPanier = [];
+    vetSel = {}; vetPanier = []; vetEquipe = '';
     vetCle = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     $('vetErreur').textContent = '';
     $('btnVetEnvoyer').disabled = false;
@@ -889,19 +890,26 @@
         + vetPanier.map((a, i) => `<div class="panier-ligne"><span>${esc(vetLibelle(a))}</span>`
           + `<button type="button" onclick="vetRetirer(${i})">Retirer</button></div>`).join('') + '</div>'
       : '';
-    let h = `<div class="etape"><div class="etape-titre"><span class="etape-num">1</span>Quoi ?</div>`
+    let h = `<div class="etape"><div class="etape-titre"><span class="etape-num">1</span>Ton équipe</div><div class="choix">`
+      + VET_EQUIPES.map(e => `<button type="button" aria-pressed="${vetEquipe === e[0]}" onclick="vetChoisirEquipe('${e[0]}')">${e[1]}</button>`).join('') + '</div></div>'
+      + `<div class="etape"><div class="etape-titre"><span class="etape-num">2</span>Quoi ?</div>`
       + vetBoutons('article', VETEMENTS.map(v => ({ val: v.article, lib: (VET_ICONES[v.article] || '') + ' ' + v.article }))) + '</div>';
     const d = vetDef(vetSel.article);
     if (d && d.modeles) {
-      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">2</span>Modèle</div>`
+      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">3</span>Modèle</div>`
         + vetBoutons('modele', d.modeles.map(m => ({ val: m.nom, lib: m.nom }))) + '</div>';
     }
     const tailles = vetTailles();
     if (tailles.length) {
-      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">3</span>${tailles.every(t => /^\d+$/.test(t) && +t >= 30) ? 'Pointure' : 'Taille'}</div>`
+      h += `<div class="etape"><div class="etape-titre"><span class="etape-num">4</span>${tailles.every(t => /^\d+$/.test(t) && +t >= 30) ? 'Pointure' : 'Taille'}</div>`
         + vetBoutons('taille', tailles.map(t => ({ val: t, lib: t }))) + '</div>';
     }
     $('vetCorps').innerHTML = h;
+  }
+  function vetChoisirEquipe(e) {
+    vetEquipe = e;
+    $('vetErreur').textContent = '';
+    const y = window.scrollY; vetRendre(); window.scrollTo(0, y);
   }
   function vetChoisir(btn) {
     const cle = btn.dataset.cle, val = btn.dataset.val;
@@ -933,11 +941,12 @@
     // Article sélectionné mais pas encore ajouté : on le prend (s'il est complet)
     if (vetSel.article && !vetPrendreSelection()) return;
     if (!vetPanier.length) { $('vetErreur').textContent = 'Ajoute au moins un article.'; return; }
+    if (!vetEquipe) { $('vetErreur').textContent = 'Choisis ton équipe.'; window.scrollTo(0, 0); return; }
     if (!navigator.onLine) { toast('Pas de réseau. Réessaie dans un instant.', true); return; }
     $('btnVetEnvoyer').disabled = true;
     chargement(true);
     try {
-      const r = await appel('vetDemander', { code: codeOperateur, articles: vetPanier, cleEnvoi: vetCle });
+      const r = await appel('vetDemander', { code: codeOperateur, equipe: vetEquipe, articles: vetPanier, cleEnvoi: vetCle });
       if (!r.success) throw new Error(r.error || 'Envoi impossible.');
       $('resRond').className = 'rond'; $('resRond').textContent = '✓';
       $('resTitre').textContent = 'Demande envoyée';
