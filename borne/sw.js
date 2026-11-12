@@ -1,22 +1,8 @@
-// Service worker de la borne : garde la page en cache (démarrage même si le wifi est lent).
-// Les envois vers Apps Script (script.google.com) passent toujours en direct.
-const CACHE = 'mutual-borne-v13';
-const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', '../assets/logo-mutual.png'];
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
-  self.skipWaiting();
-});
-
+// Ancienne adresse de la borne : ce service worker se retire et vide l'ancien cache.
+// La borne est désormais sur https://glvq1.github.io/mutual-borne/ (cache « mutual-borne-app-* », non touché).
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
-  // Ne supprime que les anciens caches de la borne (pas ceux de Mutual Connect)
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k.indexOf('mutual-borne-') === 0 && k !== CACHE).map(k => caches.delete(k)))));
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  if (url.origin !== location.origin || e.request.method !== 'GET') return;
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+  e.waitUntil(caches.keys()
+    .then(keys => Promise.all(keys.filter(k => /^mutual-borne-v\d+$/.test(k)).map(k => caches.delete(k))))
+    .then(() => self.registration.unregister()));
 });

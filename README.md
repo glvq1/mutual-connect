@@ -106,9 +106,10 @@ Tablettes de l'entrepôt : les installer soi-même une fois.
 - iPhone/iPad : l'export Excel ouvre un aperçu → Partager → Enregistrer dans Fichiers.
 - Firefox ordinateur : installation non garantie, navigateur OK.
 
-## Borne libre-service (`/borne/`)
+## Borne libre-service
 
-Tablette en libre-service pour les opérateurs : https://glvq1.github.io/mutual-connect/borne/
+Tablette en libre-service pour les opérateurs : https://glvq1.github.io/mutual-borne/ (dépôt `glvq1/mutual-borne`).
+Sortie de ce dépôt pour être installable à côté de Mutual Connect : `/borne/` ne contient plus qu'une redirection.
 
 - Identification par code opérateur (`FR` + 3 lettres + 2 ou 3 chiffres).
 - Remontées techniques (formulaires existants simplifiés) et locaux (salle de pause, chambre, toilettes, vestiaires, autre).
