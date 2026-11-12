@@ -163,6 +163,18 @@
     .chargement { position: fixed; inset: 0; background: rgba(250,248,243,.7); z-index: 15; display: flex; align-items: center; justify-content: center; }
     .roue { width: 56px; height: 56px; border-radius: 50%; border: 6px solid var(--soft); border-top-color: var(--primary); animation: tourne .8s linear infinite; }
     @keyframes tourne { to { transform: rotate(360deg); } }
+    /* ----- Avertissement d'inactivité ----- */
+    .veille { position: fixed; inset: 0; z-index: 50; background: rgba(40,32,20,.6); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .veille[hidden] { display: none; }
+    .veille-carte { width: 100%; max-width: 560px; background: #fff; border-radius: 22px; border-top: 8px solid var(--primary); padding: 30px 28px 24px; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.3); }
+    .veille-carte h2 { margin: 0 0 6px; font-size: 28px; }
+    .veille-carte p { margin: 0 0 18px; font-size: 18px; color: #666; }
+    .veille-compte { width: 120px; height: 120px; margin: 4px auto 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 52px; font-weight: 900; color: var(--secondary); background: conic-gradient(var(--primary) calc(var(--p, 1) * 360deg), var(--soft) 0); position: relative; }
+    .veille-compte::before { content: ''; position: absolute; inset: 10px; border-radius: 50%; background: #fff; }
+    .veille-compte span { position: relative; }
+    .veille-actions { display: flex; gap: 12px; }
+    .veille-actions .btn { flex: 1; }
     .hors-ligne { background: var(--red-bg); color: var(--red); text-align: center; font-weight: 700; padding: 10px; }
     @media (max-width: 860px) {
       .ident { grid-template-columns: 1fr; }
@@ -383,6 +395,18 @@
     </section>
   </main>
 
+  <div class="veille" id="veille" hidden role="alertdialog" aria-modal="true" aria-labelledby="veilleTitre">
+    <div class="veille-carte">
+      <h2 id="veilleTitre">Tu es toujours là ?</h2>
+      <p>Sans action, la borne te déconnecte et ta saisie en cours sera perdue.</p>
+      <div class="veille-compte" id="veilleCompte"><span id="veilleSec"></span></div>
+      <div class="veille-actions">
+        <button type="button" class="btn second" onclick="deconnecter()">⏏ Me déconnecter</button>
+        <button type="button" class="btn principal" onclick="continuerSession()">✋ Je continue</button>
+      </div>
+    </div>
+  </div>
+
   <div class="chargement" id="chargement" hidden><div class="roue"></div></div>
 
   <script>
@@ -392,7 +416,8 @@
   // ============================================================
   const EXEC_URL = 'https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec';
   const MOTIF_CODE = /^[A-Z0-9]{2,16}$/; // vérifié ensuite par le serveur (liste des opérateurs)
-  const INACTIVITE_MS = 60000;      // déconnexion automatique sans action
+  const INACTIVITE_MS = 15000;      // sans action : avertissement « Tu es toujours là ? »
+  const AVERTISSEMENT_S = 15;       // puis décompte avant déconnexion automatique (total 30 s)
   const RETOUR_RESULTAT_S = 30;     // après une remontée : déconnexion auto en 30 s
   const CLE_JETON = 'borne_jeton', CLE_LISTES = 'borne_listes';
 
@@ -450,7 +475,7 @@
   let codeOperateur = '', nomOperateur = '';
   let saisieCode = '';
   let formType = null, valeurs = {}, cleEnvoi = '';
-  let minuteurInactivite = null, minuteurResultat = null, retourSuivi = 'eIdent';
+  let minuteurInactivite = null, minuteurVeille = null, minuteurResultat = null, retourSuivi = 'eIdent';
 
   function lireStockage(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -571,20 +596,48 @@
     }
   }
   function deconnecter() {
+    clearTimeout(minuteurInactivite); fermerVeille();
     codeOperateur = ''; nomOperateur = '';
     formType = null;
     vetSel = {}; vetPanier = []; repSel = {}; qhseSel = {};
     demarrerIdent();
   }
 
-  // ----- Inactivité : retour à l'identification -----
+  // ----- Inactivité : avertissement puis retour à l'identification -----
+  function veilleVisible() { return !$('veille').hidden; }
+  function fermerVeille() {
+    clearInterval(minuteurVeille); minuteurVeille = null;
+    $('veille').hidden = true;
+  }
   function relancerInactivite() {
     clearTimeout(minuteurInactivite);
+    fermerVeille();
     const actif = document.querySelector('.ecran.actif');
-    if (!actif || actif.id === 'eInstall' || (actif.id === 'eIdent' && !saisieCode)) return;
-    minuteurInactivite = setTimeout(deconnecter, INACTIVITE_MS);
+    if (!actif || actif.id === 'eInstall' || actif.id === 'eResultat' || (actif.id === 'eIdent' && !saisieCode)) return;
+    minuteurInactivite = setTimeout(ouvrirVeille, INACTIVITE_MS);
   }
-  ['pointerdown', 'keydown', 'input'].forEach(ev => document.addEventListener(ev, () => {
+  function ouvrirVeille() {
+    // Écran de confirmation : il a déjà son propre décompte
+    const actif = document.querySelector('.ecran.actif');
+    if (!actif || actif.id === 'eResultat' || actif.id === 'eInstall' || (actif.id === 'eIdent' && !saisieCode)) return;
+    let s = AVERTISSEMENT_S;
+    const maj = () => {
+      $('veilleSec').textContent = s;
+      $('veilleCompte').style.setProperty('--p', s / AVERTISSEMENT_S);
+    };
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // range le clavier
+    maj();
+    $('veille').hidden = false;
+    minuteurVeille = setInterval(() => {
+      s--;
+      if (s <= 0) { fermerVeille(); deconnecter(); } else maj();
+    }, 1000);
+  }
+  function continuerSession() { relancerInactivite(); }
+  // Appui à côté de la fenêtre = « Je continue » (sans déclencher le bouton situé dessous)
+  $('veille').addEventListener('click', e => { if (e.target === $('veille')) continuerSession(); });
+  ['pointerdown', 'keydown', 'input'].forEach(ev => document.addEventListener(ev, e => {
+    if (veilleVisible()) return; // pendant l'avertissement, seuls ses boutons comptent
     if (!document.querySelector('#eResultat.actif')) relancerInactivite();
   }, true));
 
