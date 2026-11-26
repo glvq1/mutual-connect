@@ -33,7 +33,7 @@ self.addEventListener('notificationclick', e => {
     return ouverte ? ouverte.focus() : clients.openWindow(url);
   }));
 });
-const CACHE = 'mutual-shell-v12';
+const CACHE = 'mutual-shell-v13';
 const SHELL = ['./', 'index.html', 'manifest.json', 'firebase-config.js', 'icon-192.png', 'icon-512.png', 'assets/logo-mutual.png'];
 
 self.addEventListener('install', e => {

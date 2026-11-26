@@ -14,7 +14,7 @@
 <script>
 window.MC_EXEC_URL = 'https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec';
 // Modules passés sur Supabase (les autres restent sur Apps Script). Clé publique : lecture et fonctions contrôlées seulement.
-window.MC_SUPABASE = {"url": "https://osdasoqtozsdwknzebam.supabase.co", "cle": "sb_publishable_JwsLmgHt0DHeEYhXN0hfEg_EiGs3FOf", "site": "allonnes", "modules": {"gares": true, "remontees": true}};
+window.MC_SUPABASE = {"url": "https://osdasoqtozsdwknzebam.supabase.co", "cle": "sb_publishable_JwsLmgHt0DHeEYhXN0hfEg_EiGs3FOf", "site": "allonnes", "modules": {"gares": true, "remontees": true, "stockage": true}};
 // Messages de l'appli envoyés avant que la coquille soit prête (traités au démarrage de la coquille)
 window.mcsFile = [];
 addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.push(e); });
@@ -42,13 +42,26 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
     remontees: {
       getToutesRemontees: 'rem_toutes',
       loadData: function (args) { return /^form\d{1,2}_records$/.test(String(args[0] || '')) ? 'rem_liste' : null; }
+    },
+    // Tournées gerbées, anomalies, nettoyage, pointages : lecture / écriture directes (clé / valeur)
+    stockage: {
+      loadData: function (args) { return /^form\d{1,2}_records$/.test(String(args[0] || '')) ? null : 'kv_lire'; },
+      saveData: 'kv_ecrire'
     }
   };
   var routeSb = {};
   if (SB && SB.url && SB.cle) {
     Object.keys(ROUTES).forEach(function (m) {
       if (!SB.modules || !SB.modules[m]) return;
-      Object.keys(ROUTES[m]).forEach(function (f) { routeSb[f] = ROUTES[m][f]; });
+      Object.keys(ROUTES[m]).forEach(function (f) {
+        var avant = routeSb[f], route = ROUTES[m][f];
+        if (!avant) { routeSb[f] = route; return; }
+        // même fonction routée par deux modules (loadData) : la 1re qui répond gagne
+        routeSb[f] = function (args) {
+          var a = typeof avant === 'function' ? avant(args) : avant;
+          return a || (typeof route === 'function' ? route(args) : route);
+        };
+      });
     });
   }
 
@@ -87,7 +100,7 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
 
   // [SYNCHRO] Versions des modules passés sur Supabase : changées par le temps réel (voir plus bas).
   // getVersions() (Apps Script) garde les autres modules ; on y remplace la version de ces modules.
-  var versionsSb = {}, tempsReelOk = {};
+  var versionsSb = {}, tempsReelOk = {}, tempsReelOkPour = function () { return false; };
   function appel(nom, args) {
     var cible = typeof routeSb[nom] === 'function' ? routeSb[nom](args) : routeSb[nom];
     if (cible) return appelSupabase(cible, args);
@@ -97,7 +110,7 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
         v = v || {};
         Object.keys(versionsSb).forEach(function (m) {
           // Temps réel coupé : version qui change toutes les 30 s → relecture régulière de secours
-          v[m] = tempsReelOk[m] ? versionsSb[m] : 'sb-secours-' + Math.floor(Date.now() / 30000);
+          v[m] = tempsReelOkPour(m) ? versionsSb[m] : 'sb-secours-' + Math.floor(Date.now() / 30000);
         });
         return v;
       });
@@ -129,31 +142,50 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
   window.google.script = { run: runner(null, null, undefined) };
 
   // ===== Temps réel Supabase =====
-  // Chaque changement d'une table du module → nouvelle version du module → l'écran ouvert se relit
-  // (mécanisme [SYNCHRO] de l'appli, déclenché tout de suite au lieu d'attendre les 10 s).
+  // Changement dans une table → module(s) de synchro de l'appli concerné(s) → nouvelle version →
+  // l'écran ouvert se relit tout de suite (mécanisme [SYNCHRO] de l'appli) au lieu d'attendre 10 s.
   var TABLES = {
     gares: ['gares_attributions', 'portes_attributions', 'gares_blocages', 'tournees_parties', 'plans_chargement'],
-    remontees: ['remontees']
+    remontees: ['remontees'],
+    stockage: ['stockage']
   };
-  // Action en plus de la nouvelle version : remontées → relecture immédiate (sinon toutes les 15 s)
+  // Modules de synchro de l'appli touchés par un changement (payload Supabase)
+  var CIBLES = {
+    gares: function () { return ['gares']; },
+    remontees: function () { return []; },
+    stockage: function (p) {
+      var k = String(((p && p.new) || {}).cle || ((p && p.old) || {}).cle || '');
+      if (k === 'tourneesData') return ['tournees'];
+      if (k === 'anomalieData') return ['anomalie'];
+      if (k.indexOf('nettoyage_') === 0) return ['nettoyage'];
+      if (k === 'bacCasse_records' || k === 'rollHorsZone_records') return ['pointages'];
+      return ['tournees', 'anomalie', 'nettoyage', 'pointages']; // clé inconnue : on relit tout
+    }
+  };
+  var SYNCHROS = { gares: ['gares'], remontees: [], stockage: ['tournees', 'anomalie', 'nettoyage', 'pointages'] };
+  // Action directe : remontées → relecture immédiate (sinon toutes les 15 s)
   var ACTIONS = {
     remontees: function () { if (typeof window.rafraichirRemontees === 'function') { try { window.rafraichirRemontees(); } catch (e) {} } }
   };
   var modulesTempsReel = Object.keys(TABLES).filter(function (m) { return SB && SB.modules && SB.modules[m]; });
   if (!modulesTempsReel.length) return;
 
-  var attenteAction = {};
-  function nouvelleVersion(m) {
-    if (ACTIONS[m]) {
-      // plusieurs changements d'affilée (traitement d'un engin = plusieurs lignes) : une seule relecture
-      clearTimeout(attenteAction[m]);
-      attenteAction[m] = setTimeout(ACTIONS[m], 400);
-      return;
-    }
-    versionsSb[m] = 'sb-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
-    if (typeof window.syVerifier === 'function') { try { window.syVerifier(true); } catch (e) {} }
+  var source = {}; // module de synchro → module Supabase qui l'alimente
+  modulesTempsReel.forEach(function (m) {
+    SYNCHROS[m].forEach(function (s) { source[s] = m; versionsSb[s] = 'sb-depart'; });
+  });
+  // getVersions (plus haut) : secours toutes les 30 s si le temps réel du module source est coupé
+  tempsReelOkPour = function (s) { return !!tempsReelOk[source[s]]; };
+
+  var attente = {};
+  function differer(cle, fn) { clearTimeout(attente[cle]); attente[cle] = setTimeout(fn, 400); }
+  function changement(m, payload) {
+    if (ACTIONS[m]) differer('action-' + m, ACTIONS[m]); // plusieurs lignes d'affilée : une seule relecture
+    var cibles = CIBLES[m](payload);
+    if (!cibles.length) return;
+    cibles.forEach(function (s) { versionsSb[s] = 'sb-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); });
+    differer('synchro', function () { if (typeof window.syVerifier === 'function') { try { window.syVerifier(true); } catch (e) {} } });
   }
-  modulesTempsReel.forEach(function (m) { if (!ACTIONS[m]) versionsSb[m] = 'sb-depart'; });
 
   function demarrer() {
     if (!window.supabase || !window.supabase.createClient) return;
@@ -162,12 +194,12 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
       var canal = client.channel('mc-' + m);
       TABLES[m].forEach(function (t) {
         // Pas de filtre par site : les suppressions ne seraient pas transmises (seule la clé est envoyée)
-        canal = canal.on('postgres_changes', { event: '*', schema: 'public', table: t }, function () { nouvelleVersion(m); });
+        canal = canal.on('postgres_changes', { event: '*', schema: 'public', table: t }, function (p) { changement(m, p); });
       });
       var dejaConnecte = false;
       canal.subscribe(function (etat) {
         // Reconnexion après coupure : des changements ont pu être manqués → relecture
-        if (etat === 'SUBSCRIBED') { tempsReelOk[m] = true; if (dejaConnecte) nouvelleVersion(m); dejaConnecte = true; }
+        if (etat === 'SUBSCRIBED') { tempsReelOk[m] = true; if (dejaConnecte) changement(m, null); dejaConnecte = true; }
         else if (etat === 'CHANNEL_ERROR' || etat === 'TIMED_OUT' || etat === 'CLOSED') tempsReelOk[m] = false;
       });
     });
