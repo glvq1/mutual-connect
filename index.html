@@ -13,18 +13,43 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>
 window.MC_EXEC_URL = 'https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec';
+// Modules passés sur Supabase (les autres restent sur Apps Script). Clé publique : lecture et fonctions contrôlées seulement.
+window.MC_SUPABASE = {"url": "https://osdasoqtozsdwknzebam.supabase.co", "cle": "sb_publishable_JwsLmgHt0DHeEYhXN0hfEg_EiGs3FOf", "site": "allonnes", "modules": {"gares": true}};
 // Messages de l'appli envoyés avant que la coquille soit prête (traités au démarrage de la coquille)
 window.mcsFile = [];
 addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.push(e); });
 </script>
 <script>
 // Remplace google.script.run quand l'appli est servie hors d'Apps Script (GitHub Pages).
-// Même API (withSuccessHandler / withFailureHandler / withUserObject / nomDeFonction(...)),
-// mais chaque appel part en POST vers le doPost du script (voir Rpc.gs).
+// Même API (withSuccessHandler / withFailureHandler / withUserObject / nomDeFonction(...)).
+// Chaque appel part :
+//   • vers Supabase si son module y a basculé (window.MC_SUPABASE.modules) : POST /rest/v1/rpc/<fonction SQL> ;
+//   • sinon vers le doPost du script Apps Script (voir Rpc.gs).
 (function () {
   var EXEC = window.MC_EXEC_URL;
+  var SB = window.MC_SUPABASE || null;
 
-  function appel(nom, args) {
+  // Fonctions Apps Script → fonctions SQL Supabase, par module
+  var ROUTES = {
+    gares: {
+      getPlanGares: 'ga_get_plan', enregistrerGare: 'ga_enregistrer_gare', enregistrerGaresGroupe: 'ga_enregistrer_groupe',
+      enregistrerSuggestionsGares: 'ga_enregistrer_suggestions', libererGare: 'ga_liberer_gare', libererTournee: 'ga_liberer_tournee',
+      libererGaresListe: 'ga_liberer_liste', libererToutesGares: 'ga_liberer_toutes', enregistrerPorte: 'ga_enregistrer_porte',
+      bloquerGare: 'ga_bloquer', leverBlocageGare: 'ga_lever_blocage', annulerGares: 'ga_annuler',
+      getPlansChargement: 'pc_get_plans', getTourneesParties: 'pc_get_parties', marquerTourneesParties: 'pc_marquer_parties'
+    }
+  };
+  var routeSb = {};
+  if (SB && SB.url && SB.cle) {
+    Object.keys(ROUTES).forEach(function (m) {
+      if (!SB.modules || !SB.modules[m]) return;
+      Object.keys(ROUTES[m]).forEach(function (f) { routeSb[f] = ROUTES[m][f]; });
+    });
+  }
+
+  function erreurReseau() { throw new Error('Connexion au serveur impossible. Vérifiez le réseau.'); }
+
+  function appelAppsScript(nom, args) {
     return fetch(EXEC, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // pas de pré-vol CORS
@@ -34,13 +59,44 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
     }).then(function (r) {
       if (!r.ok) throw new Error('Serveur indisponible (' + r.status + ').');
       return r.json();
-    }, function () {
-      throw new Error('Connexion au serveur impossible. Vérifiez le réseau.');
-    }).then(function (d) {
+    }, erreurReseau).then(function (d) {
       if (!d || d.rpc !== true) throw new Error('Réponse serveur inattendue.');
       if (!d.ok) throw new Error(d.error || 'Erreur serveur.');
       return d.value;
     });
+  }
+
+  function appelSupabase(fn, args) {
+    return fetch(SB.url + '/rest/v1/rpc/' + fn, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SB.cle },
+      body: JSON.stringify({ args: args, site: SB.site || 'allonnes' }),
+      credentials: 'omit'
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (d) {
+        if (!r.ok) throw new Error((d && (d.message || d.hint)) || ('Base indisponible (' + r.status + ').'));
+        return d;
+      });
+    }, erreurReseau);
+  }
+
+  // [SYNCHRO] Versions des modules passés sur Supabase : changées par le temps réel (voir plus bas).
+  // getVersions() (Apps Script) garde les autres modules ; on y remplace la version de ces modules.
+  var versionsSb = {}, tempsReelOk = {};
+  function appel(nom, args) {
+    if (routeSb[nom]) return appelSupabase(routeSb[nom], args);
+    var p = appelAppsScript(nom, args);
+    if (nom === 'getVersions') {
+      p = p.then(function (v) {
+        v = v || {};
+        Object.keys(versionsSb).forEach(function (m) {
+          // Temps réel coupé : version qui change toutes les 30 s → relecture régulière de secours
+          v[m] = tempsReelOk[m] ? versionsSb[m] : 'sb-secours-' + Math.floor(Date.now() / 30000);
+        });
+        return v;
+      });
+    }
+    return p;
   }
 
   function runner(succes, echec, objet) {
@@ -65,6 +121,45 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
 
   window.google = window.google || {};
   window.google.script = { run: runner(null, null, undefined) };
+
+  // ===== Temps réel Supabase =====
+  // Chaque changement d'une table du module → nouvelle version du module → l'écran ouvert se relit
+  // (mécanisme [SYNCHRO] de l'appli, déclenché tout de suite au lieu d'attendre les 10 s).
+  var TABLES = {
+    gares: ['gares_attributions', 'portes_attributions', 'gares_blocages', 'tournees_parties', 'plans_chargement']
+  };
+  var modulesTempsReel = Object.keys(TABLES).filter(function (m) { return SB && SB.modules && SB.modules[m]; });
+  if (!modulesTempsReel.length) return;
+
+  function nouvelleVersion(m) {
+    versionsSb[m] = 'sb-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    if (typeof window.syVerifier === 'function') { try { window.syVerifier(true); } catch (e) {} }
+  }
+  modulesTempsReel.forEach(function (m) { versionsSb[m] = 'sb-depart'; });
+
+  function demarrer() {
+    if (!window.supabase || !window.supabase.createClient) return;
+    var client = window.supabase.createClient(SB.url, SB.cle, { auth: { persistSession: false, autoRefreshToken: false } });
+    modulesTempsReel.forEach(function (m) {
+      var canal = client.channel('mc-' + m);
+      TABLES[m].forEach(function (t) {
+        // Pas de filtre par site : les suppressions ne seraient pas transmises (seule la clé est envoyée)
+        canal = canal.on('postgres_changes', { event: '*', schema: 'public', table: t }, function () { nouvelleVersion(m); });
+      });
+      var dejaConnecte = false;
+      canal.subscribe(function (etat) {
+        // Reconnexion après coupure : des changements ont pu être manqués → relecture
+        if (etat === 'SUBSCRIBED') { tempsReelOk[m] = true; if (dejaConnecte) nouvelleVersion(m); dejaConnecte = true; }
+        else if (etat === 'CHANNEL_ERROR' || etat === 'TIMED_OUT' || etat === 'CLOSED') tempsReelOk[m] = false;
+      });
+    });
+  }
+  var sc = document.createElement('script');
+  sc.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+  sc.async = true;
+  sc.onload = demarrer;
+  sc.onerror = function () { console.warn('Temps réel indisponible : actualisation toutes les 10 s seulement.'); };
+  document.head.appendChild(sc);
 })();
 
 </script>
