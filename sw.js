@@ -1,4 +1,4 @@
-// Service worker : met en cache la coquille (pas l'app Apps Script, toujours en ligne)
+// Service worker : met en cache la page de l'appli (les données viennent toujours d'Apps Script)
 // + réception des notifications push (Firebase Cloud Messaging)
 try {
   importScripts(
@@ -33,7 +33,7 @@ self.addEventListener('notificationclick', e => {
     return ouverte ? ouverte.focus() : clients.openWindow(url);
   }));
 });
-const CACHE = 'mutual-shell-v9';
+const CACHE = 'mutual-shell-v10';
 const SHELL = ['./', 'index.html', 'manifest.json', 'firebase-config.js', 'icon-192.png', 'icon-512.png', 'assets/logo-mutual.png'];
 
 self.addEventListener('install', e => {

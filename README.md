@@ -1,6 +1,8 @@
-# Mutual Connect — Passage en application installable (PWA)
+# Mutual Connect — application installable (PWA)
 
-Le code métier reste 100 % dans Apps Script. Ce dossier n'est qu'une « coquille » qui affiche l'URL `/exec`.
+> **Depuis novembre 2026 (étape 1 de la migration)** : `index.html` est **généré** depuis `app.html` (dépôt privé `mutual-connect-gas`, script `outils/construire_front.py prod`). L'appli n'est plus dans une iframe : la page appelle directement le `doPost` Apps Script (`Rpc.gs`). Ne pas modifier `index.html` à la main. Les sections ci-dessous décrivent l'ancienne coquille et sont gardées pour l'historique.
+
+Le code métier reste dans Apps Script.
 Les utilisateurs réfractaires gardent un simple lien navigateur.
 
 ---
