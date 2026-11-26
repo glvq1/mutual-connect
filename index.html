@@ -14,7 +14,7 @@
 <script>
 window.MC_EXEC_URL = 'https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec';
 // Modules passés sur Supabase (les autres restent sur Apps Script). Clé publique : lecture et fonctions contrôlées seulement.
-window.MC_SUPABASE = {"url": "https://osdasoqtozsdwknzebam.supabase.co", "cle": "sb_publishable_JwsLmgHt0DHeEYhXN0hfEg_EiGs3FOf", "site": "allonnes", "modules": {"gares": true, "remontees": true, "stockage": true}};
+window.MC_SUPABASE = {"url": "https://osdasoqtozsdwknzebam.supabase.co", "cle": "sb_publishable_JwsLmgHt0DHeEYhXN0hfEg_EiGs3FOf", "site": "allonnes", "modules": {"gares": true, "remontees": true, "stockage": true, "colis": true}};
 // Messages de l'appli envoyés avant que la coquille soit prête (traités au démarrage de la coquille)
 window.mcsFile = [];
 addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.push(e); });
@@ -47,7 +47,8 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
     stockage: {
       loadData: function (args) { return /^form\d{1,2}_records$/.test(String(args[0] || '')) ? null : 'kv_lire'; },
       saveData: 'kv_ecrire'
-    }
+    },
+    colis: { listerColisFragiles: 'cf_lister', enregistrerColisFragiles: 'cf_enregistrer' }
   };
   var routeSb = {};
   if (SB && SB.url && SB.cle) {
@@ -147,7 +148,8 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
   var TABLES = {
     gares: ['gares_attributions', 'portes_attributions', 'gares_blocages', 'tournees_parties', 'plans_chargement'],
     remontees: ['remontees'],
-    stockage: ['stockage']
+    stockage: ['stockage'],
+    colis: ['stockage']
   };
   // Modules de synchro de l'appli touchés par un changement (payload Supabase)
   var CIBLES = {
@@ -159,10 +161,15 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
       if (k === 'anomalieData') return ['anomalie'];
       if (k.indexOf('nettoyage_') === 0) return ['nettoyage'];
       if (k === 'bacCasse_records' || k === 'rollHorsZone_records') return ['pointages'];
+      if (k === 'colis_fragiles') return []; // module colis (ci-dessous)
       return ['tournees', 'anomalie', 'nettoyage', 'pointages']; // clé inconnue : on relit tout
+    },
+    colis: function (p) {
+      var k = String(((p && p.new) || {}).cle || ((p && p.old) || {}).cle || '');
+      return (!p || k === 'colis_fragiles') ? ['colis'] : [];
     }
   };
-  var SYNCHROS = { gares: ['gares'], remontees: [], stockage: ['tournees', 'anomalie', 'nettoyage', 'pointages'] };
+  var SYNCHROS = { gares: ['gares'], remontees: [], stockage: ['tournees', 'anomalie', 'nettoyage', 'pointages'], colis: ['colis'] };
   // Action directe : remontées → relecture immédiate (sinon toutes les 15 s)
   var ACTIONS = {
     remontees: function () { if (typeof window.rafraichirRemontees === 'function') { try { window.rafraichirRemontees(); } catch (e) {} } }
