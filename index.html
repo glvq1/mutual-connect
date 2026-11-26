@@ -14,7 +14,7 @@
 <script>
 window.MC_EXEC_URL = 'https://script.google.com/macros/s/AKfycbyjCA87T_pKRb3pY7-QEIyDqHXkQdGZiij_NDpRyqrmTGvV8TZ8X0DwSxAljQpePbjm/exec';
 // Modules passés sur Supabase (les autres restent sur Apps Script). Clé publique : lecture et fonctions contrôlées seulement.
-window.MC_SUPABASE = {"url": "https://osdasoqtozsdwknzebam.supabase.co", "cle": "sb_publishable_JwsLmgHt0DHeEYhXN0hfEg_EiGs3FOf", "site": "allonnes", "modules": {"gares": true}};
+window.MC_SUPABASE = {"url": "https://osdasoqtozsdwknzebam.supabase.co", "cle": "sb_publishable_JwsLmgHt0DHeEYhXN0hfEg_EiGs3FOf", "site": "allonnes", "modules": {"gares": true, "remontees": true}};
 // Messages de l'appli envoyés avant que la coquille soit prête (traités au démarrage de la coquille)
 window.mcsFile = [];
 addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.push(e); });
@@ -37,6 +37,11 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
       libererGaresListe: 'ga_liberer_liste', libererToutesGares: 'ga_liberer_toutes', enregistrerPorte: 'ga_enregistrer_porte',
       bloquerGare: 'ga_bloquer', leverBlocageGare: 'ga_lever_blocage', annulerGares: 'ga_annuler',
       getPlansChargement: 'pc_get_plans', getTourneesParties: 'pc_get_parties', marquerTourneesParties: 'pc_marquer_parties'
+    },
+    // Remontées : seules les LECTURES vont en direct ; les écritures restent sur Apps Script (mails, push, archive)
+    remontees: {
+      getToutesRemontees: 'rem_toutes',
+      loadData: function (args) { return /^form\d{1,2}_records$/.test(String(args[0] || '')) ? 'rem_liste' : null; }
     }
   };
   var routeSb = {};
@@ -84,7 +89,8 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
   // getVersions() (Apps Script) garde les autres modules ; on y remplace la version de ces modules.
   var versionsSb = {}, tempsReelOk = {};
   function appel(nom, args) {
-    if (routeSb[nom]) return appelSupabase(routeSb[nom], args);
+    var cible = typeof routeSb[nom] === 'function' ? routeSb[nom](args) : routeSb[nom];
+    if (cible) return appelSupabase(cible, args);
     var p = appelAppsScript(nom, args);
     if (nom === 'getVersions') {
       p = p.then(function (v) {
@@ -126,16 +132,28 @@ addEventListener('message', function (e) { if (window.mcsFile) window.mcsFile.pu
   // Chaque changement d'une table du module → nouvelle version du module → l'écran ouvert se relit
   // (mécanisme [SYNCHRO] de l'appli, déclenché tout de suite au lieu d'attendre les 10 s).
   var TABLES = {
-    gares: ['gares_attributions', 'portes_attributions', 'gares_blocages', 'tournees_parties', 'plans_chargement']
+    gares: ['gares_attributions', 'portes_attributions', 'gares_blocages', 'tournees_parties', 'plans_chargement'],
+    remontees: ['remontees']
+  };
+  // Action en plus de la nouvelle version : remontées → relecture immédiate (sinon toutes les 15 s)
+  var ACTIONS = {
+    remontees: function () { if (typeof window.rafraichirRemontees === 'function') { try { window.rafraichirRemontees(); } catch (e) {} } }
   };
   var modulesTempsReel = Object.keys(TABLES).filter(function (m) { return SB && SB.modules && SB.modules[m]; });
   if (!modulesTempsReel.length) return;
 
+  var attenteAction = {};
   function nouvelleVersion(m) {
+    if (ACTIONS[m]) {
+      // plusieurs changements d'affilée (traitement d'un engin = plusieurs lignes) : une seule relecture
+      clearTimeout(attenteAction[m]);
+      attenteAction[m] = setTimeout(ACTIONS[m], 400);
+      return;
+    }
     versionsSb[m] = 'sb-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
     if (typeof window.syVerifier === 'function') { try { window.syVerifier(true); } catch (e) {} }
   }
-  modulesTempsReel.forEach(function (m) { versionsSb[m] = 'sb-depart'; });
+  modulesTempsReel.forEach(function (m) { if (!ACTIONS[m]) versionsSb[m] = 'sb-depart'; });
 
   function demarrer() {
     if (!window.supabase || !window.supabase.createClient) return;
